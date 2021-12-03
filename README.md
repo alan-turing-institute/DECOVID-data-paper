@@ -16,10 +16,10 @@ There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours o
 * **DECOVID Code** - [link to folder]()
    * This folder contains the code used for the figures in the data paper.
 * **DECOVID Data Tables** - [link to folder]()
-  * This folder contains information about the data collected in each of the data tables.
+  * This folder contains metadata about the data collected in each of the data tables.
 * **Data Quality Information** - [link to folder]()
   * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
 * **OMOP Wiki** - [link to wiki]() 
-  * The wiki contains information about the specific version of OMOP used in this dataset. 
+  * The wiki contains information about the specific version of OMOP used in this dataset. The OMOP data model version 5.3 is being used as the common data model for DECOVID.
 
 
