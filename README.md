@@ -13,11 +13,11 @@ These data include longitudinal physiology, treatments, laboratory findings, dia
 There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours of clinical care for patients with completed visits, 9,548 fatalities (both COVID-19 and non-COVID-19 related), 115,740,643 measurements (e.g., labs, vitals, machine settings) and 16,248,577 drug exposures in the DECOVID dataset.
 
 ## Links:
-* OMOP Wiki: [link to wiki]() 
-* DECOVID Data Tables [link to folder]()
+* OMOP Wiki - [link to wiki]() 
+* DECOVID Data Tables - [link to folder]()
   * This folder contains information about the data collected in each of the data tables.
-* DECOVID Code [link to folder]()
+* DECOVID Code - [link to folder]()
    * This folder contains the code used for the figures in the data paper.
-* Data Quality Information [link to folder]()
+* Data Quality Information - [link to folder]()
   * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
 
