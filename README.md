@@ -1,4 +1,4 @@
-# DECOVID data descriptor paper
+# DECOVID Data Descriptor Paper
 
 ## Introduction
 
