@@ -15,7 +15,7 @@ There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours o
 ## Links:
 * **DECOVID Code** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/DECOVID-code)
    * This folder contains the code used for the figures in the data paper.
-* **DECOVID Data Tables** - [link to folder]()
+* **DECOVID Data Tables** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Decovid-data-tables)
   * This folder contains metadata about the data collected in each of the data tables.
 * **Data Quality Information** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Data-quality-information)
   * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
