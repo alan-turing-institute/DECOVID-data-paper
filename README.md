@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The DECOVID database contains comprehensive electronic healthcare record (EHR) data collected from patients admitted to two large, digitally-mature teaching hospitals in the United Kingdom between 1st January 2020 and 28th February 2021,  with follow-up running until the 28th March 2021 and 13th April 2021, for the two hospitals respectively. The hospital trust involved are University Hospitals Birmingham and University College London Hosptials. 
+The DECOVID database contains comprehensive electronic healthcare record (EHR) data collected from patients admitted to two large, digitally-mature teaching hospitals in the United Kingdom between 1st January 2020 and 28th February 2021,  with follow-up running until the 28th March 2021 and 13th April 2021, for the two hospitals respectively. The hospital trusts involved are University Hospitals Birmingham and University College London Hosptials. 
 
 The development of the DECOVID database was motivated by the COVID-19 pandemic with the aim of answering clinically important questions to support the COVID-19 response. 
 
