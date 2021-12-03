@@ -14,7 +14,7 @@ There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours o
 
 ## Links:
 * OMOP Wiki - [link to wiki]() 
- * The wiki contains information about the specific version of OMOP used in this dataset. 
+  * The wiki contains information about the specific version of OMOP used in this dataset. 
 * DECOVID Data Tables - [link to folder]()
   * This folder contains information about the data collected in each of the data tables.
 * DECOVID Code - [link to folder]()
