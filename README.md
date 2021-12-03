@@ -8,7 +8,7 @@ The DECOVID dataset contains comprehensive electronic healthcare record (EHR) da
 
 The development of the DECOVID database was motivated by the COVID-19 pandemic with the aim of answering clinically important questions to support the COVID-19 response. 
 
-Raw data were extracted from local EHRs and transformed into the Observational Medical Outcomes Partnership-Common Data Model (add in link here or reference). This standardises the dataset making it more useable for data analysts and interoperable for researchers outside of the DECOVID project.
+Raw data were extracted from local EHRs and transformed into the [Observational Health Data Sciences and Informatics (OHDSI) Common Data Model version 5.3.1](https://ohdsi.github.io/CommonDataModel/). This standardises the dataset making it more useable for data analysts and interoperable for researchers outside of the DECOVID project.
 
 These data include longitudinal physiology, treatments, laboratory findings, diagnoses and outcomes. 
 
