@@ -15,6 +15,7 @@ These data include longitudinal physiology, treatments, laboratory findings, dia
 * DECOVID Data Tables [link to folder]
   * This folder contains information about the data collected in each of the data tables.
 * DECOVID Code [link to folder]
+   * This folder contains the code used for the figures in the data paper.
 * Data Quality Information [link to folder]
   * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
 
