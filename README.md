@@ -1,6 +1,6 @@
 # DECOVID Data Descriptor Paper
 
-## Link to the data paper - Add reference with DOI here
+`## Add reference with DOI here`
 
 ## Introduction
 
@@ -30,4 +30,14 @@ There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours o
 * **OMOP Wiki** - [link to wiki](https://github.com/alan-turing-institute/DECOVID-data-paper/wiki/OMOP-wiki) 
   * The wiki contains information about the specific version of OMOP used in this dataset. The OMOP data model version 5.3 is being used as the common data model for DECOVID.
 
+## License:
+[![CC BY 4.0][cc-by-shield]][cc-by]
 
+This work is licensed under a
+[Creative Commons Attribution 4.0 International License][cc-by].
+
+[![CC BY 4.0][cc-by-image]][cc-by]
+
+[cc-by]: http://creativecommons.org/licenses/by/4.0/
+[cc-by-image]: https://i.creativecommons.org/l/by/4.0/88x31.png
+[cc-by-shield]: https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg
