@@ -31,6 +31,7 @@ There are 158,733 distinct patients, 258,212 hospital visits, 17,780,705 hours o
   * The wiki contains information about the specific version of OMOP used in this dataset. The OMOP data model version 5.3 is being used as the common data model for DECOVID.
 
 ## License:
+### For documentation:
 [![CC BY 4.0][cc-by-shield]][cc-by]
 
 This work is licensed under a
@@ -41,3 +42,9 @@ This work is licensed under a
 [cc-by]: http://creativecommons.org/licenses/by/4.0/
 [cc-by-image]: https://i.creativecommons.org/l/by/4.0/88x31.png
 [cc-by-shield]: https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg
+
+### For Software/code:
+### The MIT License
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
+`[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)`
+
