@@ -47,4 +47,5 @@ This work is licensed under a
 ### The MIT License
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
 
+This work is licensed under a [MIT license](https://opensource.org/licenses/MIT)
 
