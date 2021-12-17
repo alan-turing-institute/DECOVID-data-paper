@@ -38,7 +38,7 @@ With the understanding that:
 
 ## Software/code
 
-Except where otherwise noted, the software and infrastructure provided by the The Turing Way Community are made available under the [OSI](https://opensource.org/)-approved [MIT license](https://opensource.org/licenses/mit-license.html).
+Except where otherwise noted, the software provided by the DECOVID data paper are made available under the [OSI](https://opensource.org/)-approved [MIT license](https://opensource.org/licenses/mit-license.html).
 
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the
