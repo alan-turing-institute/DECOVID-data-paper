@@ -19,7 +19,7 @@ vent <- DBI::dbConnect(
               RPostgres::Postgres(),
               host=rstudioapi::askForPassword(prompt="Please enter host"),
               port=port,
-              user=user,  
+              user=user,
               password=pw,
               dbname='ventilation'
 )
@@ -41,7 +41,7 @@ coag <- DBI::dbConnect(
               RPostgres::Postgres(),
               host=rstudioapi::askForPassword(prompt="Please enter host"),
               port=port,
-              user=user, 
+              user=user,
               password=pw,
               dbname='coagthrombo'
 )
@@ -63,12 +63,12 @@ MeasurementstoPull = c(37208354, 3020716, 3020460, 3007194, 4239408, 4313591, 30
 
 #This query will pull the measurements of interest
 measurement_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as units,c.visit_detail_start_datetime::timestamp, CEILING((DATE_PART('day', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp)*24)  +
-                            (DATE_PART('hour', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  + 
+                            (DATE_PART('hour', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  +
                             DATE_PART('minute', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp) / 60)) AS hour
                                              FROM omop_03082021.measurement a
                                             LEFT JOIN omop_03082021.concept b
                                             ON a.measurement_concept_id=b.concept_id
-                                            LEFT JOIN 
+                                            LEFT JOIN
                                             (SELECT MIN(visit_detail_start_datetime::timestamp) AS visit_detail_start_datetime,
                                                     MAX(visit_detail_end_datetime::timestamp) AS visit_detail_end_datetime,
                                                     visit_occurrence_id
@@ -77,7 +77,7 @@ measurement_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_nam
                                             ON a.visit_occurrence_id=c.visit_occurrence_id
                                             LEFT JOIN omop_03082021.concept d
                                             ON a.unit_concept_id=d.concept_id
-                                     WHERE measurement_concept_id IN (", 
+                                     WHERE measurement_concept_id IN (",
                                      paste0(paste0("'", MeasurementstoPull, "'", collapse=",")), ") AND
                                     ((a.measurement_datetime::timestamp >= c.visit_detail_start_datetime::timestamp) AND (a.measurement_datetime::timestamp <= c.visit_detail_end_datetime::timestamp))")
 
@@ -91,11 +91,11 @@ vent_measFigure1Pat <- dbGetQuery(vent, measurement_query_patients)
 news2_measFigure1Pat <- dbGetQuery(news2, measurement_query_patients)
 
 #Append all DECOVID's research questions data.
-omop_measFigure1Pat <- rbind(copd_measFigure1Pat, coag_measFigure1Pat, vent_measFigure1Pat, news2_measFigure1Pat) %>% 
+omop_measFigure1Pat <- rbind(copd_measFigure1Pat, coag_measFigure1Pat, vent_measFigure1Pat, news2_measFigure1Pat) %>%
                         distinct()
 
 #Enter a visit occurrence id of interest
-visit_occurrence_id_interest <- 1180370006 #Will be removed from public version
+visit_occurrence_id_interest <- 1
 
 singlepatientdata <- omop_measFigure1Pat %>%
                      #only take measures with a positive hour, as some measurements may have been taken in other levels of care prior
@@ -108,7 +108,7 @@ singlepatientdata <- omop_measFigure1Pat %>%
 
 singlepatientdata$concept_name <- as.character(singlepatientdata$concept_name)
 
-#Save original concept names in another column just in case. 
+#Save original concept names in another column just in case.
 singlepatientdata$concept_name_org = singlepatientdata$concept_name
 
 #Create new labels for some of the concepts
@@ -139,15 +139,15 @@ MeasurementsPlot = ggplot(data=singlepatientdata, aes(x=day, y=avg, colour=conce
                   scale_shape_manual(values=c(0:9)) +
                   scale_color_brewer(palette="Paired") +
                   ylab("Measurement value") +
-                  xlab("Days since hospital admission") + 
-                  theme_classic() + 
+                  xlab("Days since hospital admission") +
+                  theme_classic() +
                   theme(text=element_text(size=16),legend.position = c(0.52, 0.95),legend.title=element_blank())+  guides(colour=guide_legend(nrow=2, ncol=3), shape=guide_legend(nrow=2, ncol=3))
 MeasurementsPlot
 ggsave("Measurements_Figure1b.png", width=12, height=5.5)
 
 #Drugs/Procedures
 drugs_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as dose_units,c.visit_detail_start_datetime::timestamp,  CEILING((DATE_PART('day', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp)*24)  +
-                            (DATE_PART('hour', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  + 
+                            (DATE_PART('hour', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  +
                             DATE_PART('minute', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp) / 60)) AS hour
                                             FROM omop_03082021.drug_exposure a
                                             LEFT JOIN omop_03082021.concept b
@@ -173,7 +173,7 @@ vent_drugFigure1Pat <- dbGetQuery(vent, drugs_query_patients)
 news2_drugFigure1Pat <- dbGetQuery(news2, drugs_query_patients)
 
 #Append all DECOVID's research questions together
-omop_drugFigure1Pat <- rbind(copd_drugFigure1Pat, coag_drugFigure1Pat, vent_drugFigure1Pat, news2_drugFigure1Pat) %>% 
+omop_drugFigure1Pat <- rbind(copd_drugFigure1Pat, coag_drugFigure1Pat, vent_drugFigure1Pat, news2_drugFigure1Pat) %>%
                         distinct()
 
 #Dexamethasone
@@ -200,7 +200,7 @@ Procedures$day = Procedures$hour/24
 
 #Note, some of the limits may need to be modified based on patients
 ProceduresPlot = ggplot(data=Procedures, aes(x=day, y=quantity, colour=concept_name)) +
-                  geom_step(aes(linetype=factor(concept_name))) + geom_point(aes(shape=concept_name), size=2) + 
+                  geom_step(aes(linetype=factor(concept_name))) + geom_point(aes(shape=concept_name), size=2) +
                   scale_shape_manual(values=c(1,8)) +
                   scale_x_continuous(limits=c(0,11.4),breaks=breaks,labels=labels , expand=c(0,0))+
                   scale_y_continuous(limits=c(0,17), breaks=seq(0,17,3), expand=c(0,0))+
@@ -210,7 +210,7 @@ ProceduresPlot = ggplot(data=Procedures, aes(x=day, y=quantity, colour=concept_n
                   scale_colour_manual(values=c("blue","darkgreen")) +
                   theme(text=element_text(size=16), legend.position = c(0.58,0.95), legend.title = element_blank(),
                         axis.text.x=element_blank(), axis.title.x=element_blank()) +
-                  guides(colour=guide_legend(nrow=1, ncol=2, override.aes =  list(linetype=c(1,NA))), shape=guide_legend(nrow=1, ncol=2), linetype="none") 
+                  guides(colour=guide_legend(nrow=1, ncol=2, override.aes =  list(linetype=c(1,NA))), shape=guide_legend(nrow=1, ncol=2), linetype="none")
 
 ProceduresPlot
 
@@ -231,7 +231,7 @@ vent_visFigure1Pat <- dbGetQuery(vent,visitd_query_patients)
 news2_visFigure1Pat <- dbGetQuery(news2, visitd_query_patients)
 
 #Combine results from all research questions
-omop_visdFigure1Pat <- rbind(copd_visFigure1Pat, coag_visFigure1Pat, vent_visFigure1Pat, news2_visFigure1Pat) %>% 
+omop_visdFigure1Pat <- rbind(copd_visFigure1Pat, coag_visFigure1Pat, vent_visFigure1Pat, news2_visFigure1Pat) %>%
                         distinct() %>%
                         select(visit_detail_start_datetime, visit_detail_end_datetime, care_site_id)
 
@@ -251,11 +251,11 @@ omop_visdFigure1Pat_exp$Height = 0
 omop_visdFigure1Pat_exp$day = omop_visdFigure1Pat_exp$hour2/24
 
 ProgressLine = ggplot(omop_visdFigure1Pat_exp, aes(x=day, y=Height, colour=factor(care_site_id))) +
-              geom_path() + 
+              geom_path() +
               geom_point(shape=15) +
-              scale_y_continuous(expand=c(0,0)) + 
+              scale_y_continuous(expand=c(0,0)) +
               scale_x_continuous(limits=c(0,11.4),breaks=breaks,labels=labels , expand=c(0,0))+
-              scale_colour_manual(values=c("white", "grey", "black")) + 
+              scale_colour_manual(values=c("white", "grey", "black")) +
               theme(legend.position = "none")
 
 ggsave("ProgressLine_Figure1b.png", height=3, width=12)

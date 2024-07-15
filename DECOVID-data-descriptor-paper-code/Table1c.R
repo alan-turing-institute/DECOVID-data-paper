@@ -1,14 +1,23 @@
+
 ##############################################################################################
 #################### TABLE 1c Ventilation - DECOVID Data Descriptor Paper ####################
 ##############################################################################################
+
+#Authors: Patrick Rockenschaub (primary developer), Nicholas Bakewell, Rebecca Green, Hannah Nicholls
+#Last Updated: 12 June 2022
+
 #Load libraries
 #uncomment below if no packages have been installed previously.
-#install.packages("DBI", "dplyr", "stringr", "purrr", "zoo")
+#install.packages(c("DBI", "dplyr", "stringr", "purrr", "zoo", "sqldf", "tableone", "readr", "lubridate"))
 library(DBI) #for performing SQL queries
 library(dplyr) #for data manipulation
 library(stringr)
 library(zoo)
 library(purrr)
+library(readr)
+library(sqldf)
+library(tableone)
+library(lubridate)
 
 #Enter log-in information for the database
 port <- rstudioapi::askForPassword(prompt="Please enter port")
@@ -72,17 +81,17 @@ covid_pcr_query <- paste("SELECT visit_occurrence_id
                         USING (fact_id_1)
                         INNER JOIN
                         (SELECT specimen_id, 
-                                specimen_datetime 
+                                specimen_date
                                 FROM omop_03082021.specimen) c
                         USING (specimen_id)
                         INNER JOIN
                         (SELECT visit_occurrence_id, 
-                                visit_start_datetime, 
-                                visit_end_datetime
+                                visit_start_date, 
+                                visit_end_date
                                 FROM omop_03082021.visit_occurrence) d
                         USING (visit_occurrence_id)
-                        WHERE (specimen_datetime >=visit_start_datetime - INTERVAL'14 day' AND specimen_datetime <=visit_end_datetime) 
-                        OR (specimen_datetime >=visit_start_datetime - INTERVAL'14 day' AND visit_end_datetime IS NULL)")
+                        WHERE ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (specimen_date <=visit_end_date)) 
+                        OR ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
 covid_obs_all_query <- paste("SELECT visit_occurrence_id 
@@ -92,14 +101,13 @@ covid_obs_all_query <- paste("SELECT visit_occurrence_id
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094, 
                               320651, 37310268)) a
-                              INNER JOIN (SELECT visit_start_datetime,
-                                                 visit_end_datetime, 
+                              INNER JOIN (SELECT visit_start_date,
+                                                 visit_end_date, 
                                                  visit_occurrence_id 
                                                  FROM omop_03082021.visit_occurrence) b
                               USING (visit_occurrence_id)
-                              WHERE (condition_start_datetime >=visit_start_datetime - INTERVAL'14 day' AND condition_start_datetime <=visit_end_datetime) 
-                              OR (condition_start_datetime >=visit_start_datetime - INTERVAL'14 day' AND visit_end_datetime IS NULL)")
-
+                              WHERE ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (condition_start_date <=visit_end_date)) 
+                              OR ((condition_start_date >= visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
 copd_covid_pcr <- dbGetQuery(copd, covid_pcr_query) %>% 
@@ -207,7 +215,6 @@ coag_vent_char <- dbGetQuery(coag, vent_value_char) %>%
 news2_vent_char <- dbGetQuery(news2, vent_value_char) %>% 
   mutate(value_as_concept_id = as.numeric(value_as_concept_id))
 
-
 vent_vent_num <- dbGetQuery(vent, vent_value_num)
 
 copd_vent_num <- dbGetQuery(copd, vent_value_num)
@@ -229,11 +236,10 @@ sum(is.na(coag_vent_num))
 sum(is.na(news2_vent_char)) 
 sum(is.na(news2_vent_num)) 
 
-
 ## 3. Ventilation
 #### 3.1 Ventilation mode
 
-This code block will map vent_mode values to either "ventilation" or "no ventilation". 
+#This code block will map vent_mode values to either "ventilation" or "no ventilation". 
 
 # Ventilation - Pressure controlled ventilation, Continuous positive airway pressure/Bilevel 
 # positive airway pressure mask, High frequency oscillatory ventilation, Home CPAP unit, 
@@ -296,7 +302,7 @@ sum(is.na(news2_vent_mode))
 
 
 #### 3.2 Ventilation setting
-@This code block will:
+#This code block will:
   
 #1. Define gas volume as "positive" if either tidal volume *OR* 
 #minute volume are not NA, and "zero" otherwise. 
@@ -332,8 +338,6 @@ vent_gas_vol <- vent_vent_num %>%
     .groups = "drop"
   )
 
-vent = vent_gas_vol %>%
-  filter(visit_occurrence_id==1324200006)
 copd_gas_vol <- copd_vent_num %>% 
   filter(measurement_concept_id == 4220163 | 
            measurement_concept_id == 4353621) %>%
@@ -402,8 +406,6 @@ news2_gas_vol <- news2_vent_num %>%
 #This will extract the pressure settings. 
 #The criteria is PS>0 for PSV, PEEP>=0 AND/OR PS=0|NULL. 
 #Any records where PS AND PEEP are both NA are excluded, or if PS=0 AND is.na(PEEP).
-
-
 vent_press_set <- vent_vent_num %>% 
   filter(measurement_concept_id == 4215838 | 
            measurement_concept_id == 4216746,
@@ -520,7 +522,7 @@ news2_press_set <- news2_vent_num %>%
   filter(press_set!="Unknown")
 
 
-#### 3.2.3 Combine
+#### 3.2.3 Combine all data 
 vent_vent_set <- bind_rows(
                 vent_gas_vol %>% 
                   rename(vent_set_dt = gas_vol_dt) %>% 
@@ -855,7 +857,7 @@ vent_oxy_flow <- vent_vent_num %>%
     raw_value = str_c(unique(raw_value), collapse = "; "),
     .groups = "drop"
   )
- vent_oxy_flow$o2FL=max(parse_number(vent_oxy_flow$raw_value))
+vent_oxy_flow$o2FL=max(parse_number(vent_oxy_flow$raw_value))
  
 copd_oxy_flow <- copd_vent_num %>% 
   filter(measurement_concept_id == 4141684) %>%
@@ -869,7 +871,7 @@ copd_oxy_flow <- copd_vent_num %>%
     raw_value = str_c(unique(raw_value), collapse = "; "),
     .groups = "drop"
   )
- copd_oxy_flow$o2FL=max(parse_number(copd_oxy_flow$raw_value))
+copd_oxy_flow$o2FL=max(parse_number(copd_oxy_flow$raw_value))
 
 coag_oxy_flow <- coag_vent_num %>% 
   filter(measurement_concept_id == 4141684) %>%
@@ -883,7 +885,7 @@ coag_oxy_flow <- coag_vent_num %>%
     raw_value = str_c(unique(raw_value), collapse = "; "),
     .groups = "drop"
   )
- coag_oxy_flow$o2FL=max(parse_number(coag_oxy_flow$raw_value))
+coag_oxy_flow$o2FL=max(parse_number(coag_oxy_flow$raw_value))
 
 
 news2_oxy_flow <- news2_vent_num %>% 
@@ -898,7 +900,7 @@ news2_oxy_flow <- news2_vent_num %>%
     raw_value = str_c(unique(raw_value), collapse = "; "),
     .groups = "drop"
   )
- news2_oxy_flow$o2FL=max(parse_number(news2_oxy_flow$raw_value))
+news2_oxy_flow$o2FL=max(parse_number(news2_oxy_flow$raw_value))
 
 news_news_o2 <- news2_vent_num %>% 
   filter(measurement_concept_id == 37208377) %>%
@@ -940,9 +942,11 @@ oxygen = rbind(vent_oxy_use, copd_oxy_use, coag_oxy_use, news2_oxy_use)%>%
 
 oxygen_flow = rbind(vent_oxy_flow, copd_oxy_flow, coag_oxy_flow, news2_oxy_flow)%>% 
                     distinct() 
-#issues with numbers 
+
+#issues with the flow rate numbers, so convert to character
 oxygen_flow$o2FL = as.character(oxygen_flow$o2FL)
 
+#The O2 component of NEWS2 is only available in the NEWS database
 news2_o2 = news_news_o2
 
 phenotype <- 
@@ -953,7 +957,7 @@ phenotype <-
             arrange(visit_occurrence_id, dt)
 
 
-#Let's query the visit table, Care Site query
+#Let's query the visit table
 visit_occ_query <- paste0("SELECT visit_occurrence_id,
                                   visit_start_datetime,
                                   visit_end_datetime
@@ -969,9 +973,7 @@ news2_visit_occ <- dbGetQuery(news2, visit_occ_query)
                                         
 omop_visit_occurrence <- rbind(copd_visit_occ, coag_visit_occ, vent_visit_occ, news2_visit_occ) %>% 
                                           distinct()
-                                     
-                                        
-                                        
+
 #Join visit occurrence
 phenotype <- phenotype %>% 
              inner_join(
@@ -1025,7 +1027,7 @@ select(-ends_with("_datetime")) %>%
 mutate(rn = row_number()) %>% 
 arrange(visit_occurrence_id, dt, -rn) %>% 
 filter(rn > lag(rn) | row_number() == 1)
-
+as.numeric(phenotype$o2FL)
 # Classify ventilation status at each time point
 phenotype2 = phenotype %>% mutate(
                                 # 1. Does the evidence suggest the patient was on mechanical ventilation?
@@ -1071,20 +1073,17 @@ phenotype2 = phenotype %>% mutate(
                                           ))
                                         
 
-phenotype2$hospital_site = as.character(phenotype2$visit_occurrence_id)
-                                        
-phenotype2$hospital_site =  substr(phenotype2$hospital_site,start=nchar(phenotype2$hospital_site), stop=nchar(phenotype2$hospital_site))
-                                        
-phenotype2$hospital_site = ifelse(phenotype2$hospital_site=="4", "UHB", "UCLH")
-
+phenotype2$hospital_site = ifelse(phenotype2$visit_occurrence_id %% 10 == 4, "UHB", "UCLH")
+                                    
 phenotype2 = phenotype2 %>% 
             mutate(covid_any=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"),
-                  covid_pcr=ifelse(visit_occurrence_id %in% omop_covid_pcr$visit_occurrence_id, "Yes", "No"))
+                   covid_pcr=ifelse(visit_occurrence_id %in% omop_covid_pcr$visit_occurrence_id, "Yes", "No"))
                                         
 phenotype2$vent_status_num = case_when(phenotype2$ventilation_status=="unknown-vent" ~ 0,
                              phenotype2$ventilation_status=="no support" ~ 1,
                              phenotype2$ventilation_status=="o2 support" ~ 2,
-                             phenotype2$ventilation_status=="high flow" ~ 3,                                            phenotype2$ventilation_status=="non-invasive" ~  4,
+                             phenotype2$ventilation_status=="high flow" ~ 3, 
+                             phenotype2$ventilation_status=="non-invasive" ~  4,
                              phenotype2$ventilation_status=="invasive" ~ 5)
                                         
 phenotype2$visit_occurrence_id_char = as.character(phenotype2$visit_occurrence_id)
@@ -1106,14 +1105,26 @@ phenotype_max2_any= sqldf("SELECT  hospital_site,
                                covid_any, 
                                visit_occurrence_id_char")
 
-summaryPhen_any = phenotype_max2_any %>% 
-                  group_by(hospital_site, covid_any, vent_status_num_max) %>% 
-                  dplyr::summarise(n=n_distinct(visit_occurrence_id_char))
-
 #Note, for "No support" - those who have no respiratory measurements
 #will not be counted and the difference will have to be taken by subtracting the
 #number of visits across the phenotypes from the total visits for each category
 #in Table 1 - this difference is then added to the "No support" phenotype.
-write.csv(summaryPhen_any,"summaryPhen_any.csv", na="", row.names=FALSE )      
+
+#For summary
+omop_visit_occurrence$visit_occurrence_id_char<- as.character(omop_visit_occurrence$visit_occurrence_id)
+
+summaryPhenotype_all <- left_join(omop_visit_occurrence,phenotype_max2_any, by=c("visit_occurrence_id_char"))
+summaryPhenotype_all$vent_status_num_max_all <- ifelse(is.na(summaryPhenotype_all$vent_status_num_max), 1, summaryPhenotype_all$vent_status_num_max)
+summaryPhenotype_all$covid_any_all <- ifelse(as.character(summaryPhenotype_all$visit_occurrence_id) %in% as.character(omop_covid_all$visit_occurrence_id), "Yes", "No")
+summaryPhenotype_all$hospital_site_all <- ifelse(summaryPhenotype_all$visit_occurrence_id %% 10 ==4, "UHB", "UCLH")
+
+summaryPhenotype_all$vent_status_num_max_all <- as.character(summaryPhenotype_all$vent_status_num_max_all)
+summaryPhenotype_all$vent_status_num_max_all <- ifelse(summaryPhenotype_all$vent_status_num_max_all==0, 4, summaryPhenotype_all$vent_status_num_max_all)
+CreateTableOne(data=summaryPhenotype_all, 
+               vars=colnames(summaryPhenotype_all)[which((colnames(summaryPhenotype_all) %in% c("vent_status_num_max_all")))], 
+               strata=c("covid_any_all", "hospital_site_all"), addOverall=T, test=F, includeNA=T) %>% print(showAllLevels=T, noSpaces=T) %>%
+  
+  write.csv("vent_summary_covid_all_Paper.csv", row.names=T, na="")
+
 
 #repeat steps for PCR cases if of interest.
