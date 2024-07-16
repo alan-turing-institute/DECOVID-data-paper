@@ -27,87 +27,51 @@ library(sqldf)
 library(forcats)
 library(reshape2)
 
-#sign in to database
-port <- rstudioapi::askForPassword(prompt="Please enter port")
-user <- rstudioapi::askForPassword(prompt="Please enter username")
-pw <- rstudioapi::askForPassword(prompt="Please enter password")
+#Enter information for the database
+host <- rstudioapi::askForPassword(prompt="Please enter server/host")
+database <- rstudioapi::askForPassword(prompt="Please enter database name")
 
-
-vent <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='ventilation'
+db <- DBI::dbConnect(
+  odbc::odbc(),
+  driver="ODBC Driver 17 for SQL Server",
+  Authentication="ActiveDirectoryInteractive",
+  server=host,
+  database=database
 )
-print("STATUS: connected to ventilation")
-
-
-copd <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='copd'
-)
-print("STATUS: connected to copd")
-
-
-coag <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='coagthrombo'
-)
-print("STATUS: connected to coagthrombo")
-
-
-news2 <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='news2'
-)
-print("STATUS: connected to news2")
+print("STATUS: connected to database")
 
 #This is the query used to extract COVID cases
-covid_pcr_query <- paste("SELECT visit_occurrence_id
+covid_pcr_query <- paste("SELECT a.visit_occurrence_id
                         FROM
                         (SELECT visit_occurrence_id,
                                 measurement_id AS fact_id_1
-                                FROM omop_03082021.measurement
+                                FROM measurement
                                 WHERE (measurement_concept_id=37310255)
                                 AND (value_as_concept_id=37310282)) a
                         INNER JOIN
                         (SELECT fact_id_1,
                               fact_id_2 as specimen_id
-                              FROM omop_03082021.fact_relationship
+                              FROM fact_relationship
                         WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        USING (fact_id_1)
+                        ON (a.fact_id_1 = b.fact_id_1)
                         INNER JOIN
                         (SELECT specimen_id,
                                 specimen_date
-                                FROM omop_03082021.specimen) c
-                        USING (specimen_id)
+                                FROM specimen) c
+                        ON (b.specimen_id = c.specimen_id)
                         INNER JOIN
                         (SELECT visit_occurrence_id,
                                 visit_start_date,
                                 visit_end_date
-                                FROM omop_03082021.visit_occurrence) d
-                        USING (visit_occurrence_id)
-                        WHERE ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (specimen_date <=visit_end_date))
-                        OR ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                FROM visit_occurrence) d
+                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
+                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
+                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT visit_occurrence_id
+covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
                               FROM
-                              (SELECT * FROM omop_03082021.condition_occurrence
+                              (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
@@ -115,46 +79,18 @@ covid_obs_all_query <- paste("SELECT visit_occurrence_id
                               INNER JOIN (SELECT visit_start_date,
                                                  visit_end_date,
                                                  visit_occurrence_id
-                                                 FROM omop_03082021.visit_occurrence) b
-                              USING (visit_occurrence_id)
-                              WHERE ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (condition_start_date <=visit_end_date))
-                              OR ((condition_start_date >= visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                                 FROM visit_occurrence) b
+                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
+                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
+                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Run PCR Only Queries
-copd_covid_pcr <- dbGetQuery(copd, covid_pcr_query) %>%
-  distinct()
-
-coag_covid_pcr <- dbGetQuery(coag, covid_pcr_query) %>%
-  distinct()
-
-vent_covid_pcr <- dbGetQuery(vent, covid_pcr_query) %>%
-  distinct()
-
-news2_covid_pcr <- dbGetQuery(news2, covid_pcr_query) %>%
-  distinct()
-
-omop_covid_pcr <-   rbind(copd_covid_pcr, coag_covid_pcr, vent_covid_pcr, news2_covid_pcr) %>%
+omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
-copd_covid_all <- copd_covid_pcr %>%
-  rbind(dbGetQuery(copd, covid_obs_all_query)) %>%
-  distinct()
-
-coag_covid_all <- coag_covid_pcr %>%
-  rbind(dbGetQuery(coag, covid_obs_all_query)) %>%
-  distinct()
-
-vent_covid_all <- vent_covid_pcr %>%
-  rbind(dbGetQuery(vent, covid_obs_all_query)) %>%
-  distinct()
-
-news2_covid_all <- news2_covid_pcr %>%
-  rbind(dbGetQuery(news2, covid_obs_all_query)) %>%
-  distinct()
-
-#Combine all research questions.
-omop_covid_all <-   rbind(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all) %>%
+omop_covid_all <- omop_covid_pcr %>%
+  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
   distinct()
 
 #Query DECOVID for person-level summaries included
@@ -167,7 +103,7 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                                     c.gender_concept_name,
                                     d.race_concept_name,
                                     e.LSOA_code,
-                                    f.COVID,
+                                    f.covid,
                                     f.COVID_Visit_Date,
                                     (CASE WHEN f.COVID_Visit_Date IS NULL THEN b.Index_Visit_Date
                                     ELSE f.COVID_Visit_Date END) AS Date_for_Age
@@ -177,49 +113,40 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                                      gender_concept_id,
                                      location_id,
                                      year_of_birth
-                             FROM omop_03082021.person) a
+                             FROM person) a
                              LEFT JOIN
                              (SELECT person_id,
                                      MIN(visit_start_date) AS Index_Visit_Date,
                                      COUNT(visit_occurrence_id) as visit_count
-                             FROM  omop_03082021.visit_occurrence
+                             FROM  visit_occurrence
                              GROUP BY person_id) b
                              ON a.person_id=b.person_id
                              LEFT JOIN
                              (SELECT concept_id as gender_concept_id,
                                       concept_name as gender_concept_name
-                              FROM omop_03082021.concept) c
+                              FROM concept) c
                               ON a.gender_concept_id=c.gender_concept_id
                                LEFT JOIN
                              (SELECT concept_id as race_concept_id,
                                       concept_name as race_concept_name
-                              FROM omop_03082021.concept) d
+                              FROM concept) d
                               ON a.race_concept_id=d.race_concept_id
                               LEFT JOIN
                              (SELECT location_id,
                                       zip as LSOA_code
-                              FROM omop_03082021.location) e
+                              FROM location) e
                              ON a.location_id=e.location_id
                              LEFT JOIN
                              (SELECT  DISTINCT person_id,
                                       MIN(visit_start_date) as COVID_Visit_Date,
-                                      COUNT(DISTINCT person_id) as COVID
-                             FROM omop_03082021.visit_occurrence
+                                      COUNT(DISTINCT person_id) as covid
+                             FROM visit_occurrence
                              WHERE visit_occurrence_id IN (",paste0(paste0("'", omop_covid_all %>%pull(visit_occurrence_id), "'", collapse=",")), ")
                              GROUP BY person_id) f
                              ON a.person_id=f.person_id")
 
 
-copd_person_level <- dbGetQuery(copd, person_level_table)
-
-coag_person_level <- dbGetQuery(coag, person_level_table)
-
-vent_person_level <- dbGetQuery(vent, person_level_table)
-
-news2_person_level <- dbGetQuery(news2, person_level_table)
-
-#Append all four research questions together
-omop_person_table <- rbind(copd_person_level, coag_person_level, vent_person_level, news2_person_level) %>%
+omop_person_table <- dbGetQuery(db, person_level_table) %>%
   distinct() %>%
   mutate(gender_concept_name=tolower(gender_concept_name) %>% Hmisc::capitalize(),
          gender_concept_name=ifelse(gender_concept_name=="Unknown" | gender_concept_name=="No matching concept", "Unknown", gender_concept_name),
@@ -382,42 +309,42 @@ write.csv(Age_Sex_Split, "Age_Sex_Split_July2022.csv", na="", row.names=F)
 ########################################
 ########## COVID Time-series ###########
 ########################################
-covid_pcr_query_plot <- paste("SELECT visit_occurrence_id,
+covid_pcr_query_plot <- paste("SELECT a.visit_occurrence_id,
                                 person_id,
-                               'PCR' AS CASE_TYPE,
-                                specimen_date as COVID_DATE
+                               'PCR' AS case_type,
+                                specimen_date as covid_date
                         FROM
                         (SELECT visit_occurrence_id,
                                 measurement_id AS fact_id_1
-                                FROM omop_03082021.measurement
+                                FROM measurement
                                 WHERE (measurement_concept_id=37310255)
                                 AND (value_as_concept_id=37310282)) a
                         INNER JOIN
                         (SELECT fact_id_1,
                               fact_id_2 as specimen_id
-                              FROM omop_03082021.fact_relationship
+                              FROM fact_relationship
                         WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        USING (fact_id_1)
+                        ON (a.fact_id_1 = b.fact_id_1)
                         INNER JOIN
                         (SELECT specimen_id,
                                 specimen_date
-                                FROM omop_03082021.specimen) c
-                        USING (specimen_id)
+                                FROM specimen) c
+                        ON (b.specimen_id = c.specimen_id)
                         INNER JOIN
                         (SELECT visit_occurrence_id,
                                 person_id,
                                 visit_start_date,
                                 visit_end_date
-                                FROM omop_03082021.visit_occurrence) d
-                        USING (visit_occurrence_id)
-                        WHERE ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (specimen_date <= visit_end_date))
-                        OR ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                FROM visit_occurrence) d
+                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
+                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
+                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query_plot <- paste("SELECT visit_occurrence_id, person_id, 'CONDITION' AS CASE_TYPE,
-                                  condition_start_date as COVID_DATE
+covid_obs_all_query_plot <- paste("SELECT a.visit_occurrence_id, person_id, 'CONDITION' AS case_type,
+                                  condition_start_date as covid_date
                               FROM
-                              (SELECT * FROM omop_03082021.condition_occurrence
+                              (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
@@ -425,44 +352,19 @@ covid_obs_all_query_plot <- paste("SELECT visit_occurrence_id, person_id, 'CONDI
                               INNER JOIN (SELECT visit_start_date,
                                                  visit_end_date,
                                                  visit_occurrence_id
-                                                 FROM omop_03082021.visit_occurrence) b
-                              USING (visit_occurrence_id)
-                              WHERE ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (condition_start_date <= visit_end_date))
-                              OR ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                                 FROM visit_occurrence) b
+                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
+                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
+                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 
 #Run PCR Only Queries
-copd_covid_pcr_plot <- dbGetQuery(copd, covid_pcr_query_plot) %>%
-  distinct()
-
-coag_covid_pcr_plot <- dbGetQuery(coag, covid_pcr_query_plot) %>%
-  distinct()
-
-vent_covid_pcr_plot <- dbGetQuery(vent, covid_pcr_query_plot) %>%
-  distinct()
-
-news2_covid_pcr_plot <- dbGetQuery(news2, covid_pcr_query_plot) %>%
+omop_covid_pcr_plot <- dbGetQuery(db, covid_pcr_query_plot) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
-copd_covid_all_plot <- copd_covid_pcr_plot %>%
-  rbind(dbGetQuery(copd, covid_obs_all_query_plot)) %>%
-  distinct()
-
-coag_covid_all_plot <- coag_covid_pcr_plot %>%
-  rbind(dbGetQuery(coag, covid_obs_all_query_plot)) %>%
-  distinct()
-
-vent_covid_all_plot <- vent_covid_pcr_plot %>%
-  rbind(dbGetQuery(vent, covid_obs_all_query_plot)) %>%
-  distinct()
-
-news2_covid_all_plot <- news2_covid_pcr_plot %>%
-  rbind(dbGetQuery(news2, covid_obs_all_query_plot)) %>%
-  distinct()
-
-#Combine all research questions.
-omop_covid_all_plot <- rbind(copd_covid_all_plot, coag_covid_all_plot, vent_covid_all_plot, news2_covid_all_plot) %>%
+omop_covid_all_plot <- omop_covid_pcr_plot %>%
+  rbind(dbGetQuery(db, covid_obs_all_query_plot)) %>%
   distinct()
 
 #Let's arrange by visit_occurrence_id, descending order by case type
@@ -524,44 +426,36 @@ condition_q <- paste0("SELECT a.*,
                               b.concept_name,
                               c.concept_id AS concept_id_specific,
                               c.concept_name AS concept_name_specific
-                      FROM omop_03082021.condition_occurrence a
-                      LEFT JOIN omop_03082021.concept  b
+                      FROM condition_occurrence a
+                      LEFT JOIN concept  b
                       ON a.condition_type_concept_id=b.concept_id
-                      LEFT JOIN omop_03082021.concept  c
+                      LEFT JOIN concept  c
                       ON a.condition_concept_id=c.concept_id")
 
 
-copd_condition_q <- dbGetQuery(copd, condition_q)
-coag_condition_q <- dbGetQuery(coag, condition_q)
-vent_condition_q <- dbGetQuery(vent, condition_q)
-news2_condition_q <- dbGetQuery(news2, condition_q)
-
-omop_cond_all_v2 <-
-  rbind(copd_condition_q, coag_condition_q, vent_condition_q, news2_condition_q) %>%
+omop_cond_all_v2 <- dbGetQuery(db, condition_q) %>%
   distinct()
-
-rm(copd_condition_q,coag_condition_q,vent_condition_q,news2_condition_q)
 
 #The following code serves as a way
 #to look up comorbidities using Athena codes
 
 #Load concept_relationship table
 concept_relationship_q <- paste0("SELECT *
-                                FROM omop_03082021.concept_relationship")
+                                FROM concept_relationship")
 
-concept_relationship_table <- dbGetQuery(copd, concept_relationship_q)
+concept_relationship_table <- dbGetQuery(db, concept_relationship_q)
 
 #Load concept_ancestor table
 concept_ancestor_q <- paste0("SELECT *
-                              FROM omop_03082021.concept_ancestor")
+                              FROM concept_ancestor")
 
-concept_ancestor_table <- dbGetQuery(copd, concept_ancestor_q)
+concept_ancestor_table <- dbGetQuery(db, concept_ancestor_q)
 
 #Load concept table
 concept_q <- paste0("SELECT *
-                      FROM omop_03082021.concept")
+                      FROM concept")
 
-concept <- dbGetQuery(copd, concept_q)
+concept <- dbGetQuery(db, concept_q)
 
 #Find all conditions that have a "standard" mapping
 concept_relationship_table_standard_conditions <- concept_relationship_table %>%

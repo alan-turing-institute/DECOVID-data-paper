@@ -9,89 +9,42 @@ library(dplyr) #for data manipulation
 library(Hmisc) #for describing variables
 library(purrr) #for data manipulation
 
-#Connect to databases
-port <- rstudioapi::askForPassword(prompt="Please enter port")
-user <- rstudioapi::askForPassword(prompt="Please enter username")
-pw <- rstudioapi::askForPassword(prompt="Please enter password")
+#Enter information for the database
+host <- rstudioapi::askForPassword(prompt="Please enter server/host")
+database <- rstudioapi::askForPassword(prompt="Please enter database name")
 
-
-vent <- DBI::dbConnect(
-              RPostgres::Postgres(),
-              host=rstudioapi::askForPassword(prompt="Please enter host"),
-              port=port,
-              user=user,
-              password=pw,
-              dbname='ventilation'
+db <- DBI::dbConnect(
+  odbc::odbc(),
+  driver="ODBC Driver 17 for SQL Server",
+  Authentication="ActiveDirectoryInteractive",
+  server=host,
+  database=database
 )
-print("STATUS: connected to ventilation")
-
-
-copd <- DBI::dbConnect(
-              RPostgres::Postgres(),
-              host=rstudioapi::askForPassword(prompt="Please enter host"),
-              port=port,
-              user=user,
-              password=pw,
-              dbname='copd'
-)
-print("STATUS: connected to copd")
-
-
-coag <- DBI::dbConnect(
-              RPostgres::Postgres(),
-              host=rstudioapi::askForPassword(prompt="Please enter host"),
-              port=port,
-              user=user,
-              password=pw,
-              dbname='coagthrombo'
-)
-print("STATUS: connected to coagthrombo")
-
-
-news2 <- DBI::dbConnect(
-              RPostgres::Postgres(),
-              host=rstudioapi::askForPassword(prompt="Please enter host"),
-              port=port,
-              user=user,
-              password=pw,
-              dbname='news2'
-)
-print("STATUS: connected to news2")
+print("STATUS: connected to database")
 
 #Concept IDs for measurements interest for figure 1b
 MeasurementstoPull = c(37208354, 3020716, 3020460, 3007194, 4239408, 4313591, 3013502,4141684,3027315,40762499  )
 
 #This query will pull the measurements of interest
-measurement_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as units,c.visit_detail_start_datetime::timestamp, CEILING((DATE_PART('day', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp)*24)  +
-                            (DATE_PART('hour', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  +
-                            DATE_PART('minute', a.measurement_datetime::timestamp - c.visit_detail_start_datetime::timestamp) / 60)) AS hour
-                                             FROM omop_03082021.measurement a
-                                            LEFT JOIN omop_03082021.concept b
+measurement_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as units,c.visit_detail_start_datetime, CEILING(DATEDIFF(minute,  a.measurement_datetime,  c.visit_detail_start_datetime)/ 60) AS hour
+                                             FROM measurement a
+                                            LEFT JOIN concept b
                                             ON a.measurement_concept_id=b.concept_id
                                             LEFT JOIN
-                                            (SELECT MIN(visit_detail_start_datetime::timestamp) AS visit_detail_start_datetime,
-                                                    MAX(visit_detail_end_datetime::timestamp) AS visit_detail_end_datetime,
+                                            (SELECT MIN(visit_detail_start_datetime) AS visit_detail_start_datetime,
+                                                    MAX(visit_detail_end_datetime) AS visit_detail_end_datetime,
                                                     visit_occurrence_id
-                                            FROM omop_03082021.visit_detail
+                                            FROM visit_detail
                                             GROUP BY visit_occurrence_id) c
                                             ON a.visit_occurrence_id=c.visit_occurrence_id
-                                            LEFT JOIN omop_03082021.concept d
+                                            LEFT JOIN concept d
                                             ON a.unit_concept_id=d.concept_id
                                      WHERE measurement_concept_id IN (",
                                      paste0(paste0("'", MeasurementstoPull, "'", collapse=",")), ") AND
-                                    ((a.measurement_datetime::timestamp >= c.visit_detail_start_datetime::timestamp) AND (a.measurement_datetime::timestamp <= c.visit_detail_end_datetime::timestamp))")
+                                    (DATEDIFF(minute, c.visit_detail_start_datetime, a.measurement_datetime) >= 0 AND DATEDIFF(minute, a.measurement_datetime, c.visit_detail_end_datetime) >= 0)")
 
 
-copd_measFigure1Pat <- dbGetQuery(copd, measurement_query_patients)
-
-coag_measFigure1Pat <- dbGetQuery(coag, measurement_query_patients)
-
-vent_measFigure1Pat <- dbGetQuery(vent, measurement_query_patients)
-
-news2_measFigure1Pat <- dbGetQuery(news2, measurement_query_patients)
-
-#Append all DECOVID's research questions data.
-omop_measFigure1Pat <- rbind(copd_measFigure1Pat, coag_measFigure1Pat, vent_measFigure1Pat, news2_measFigure1Pat) %>%
+omop_measFigure1Pat <- dbGetQuery(db, measurement_query_patients) %>%
                         distinct()
 
 #Enter a visit occurrence id of interest
@@ -146,34 +99,23 @@ MeasurementsPlot
 ggsave("Measurements_Figure1b.png", width=12, height=5.5)
 
 #Drugs/Procedures
-drugs_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as dose_units,c.visit_detail_start_datetime::timestamp,  CEILING((DATE_PART('day', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp)*24)  +
-                            (DATE_PART('hour', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp)  +
-                            DATE_PART('minute', a.drug_exposure_start_datetime::timestamp - c.visit_detail_start_datetime::timestamp) / 60)) AS hour
-                                            FROM omop_03082021.drug_exposure a
-                                            LEFT JOIN omop_03082021.concept b
+drugs_query_patients <- paste0("SELECT a.* , b.concept_name, d.concept_name as dose_units,c.visit_detail_start_datetime,  CEILING(DATEDIFF(minute, a.drug_exposure_start_datetime, c.visit_detail_start_datetime) / 60) AS hour
+                                            FROM drug_exposure a
+                                            LEFT JOIN concept b
                                             ON a.drug_concept_id=b.concept_id
                                             LEFT JOIN
-                                            (SELECT MIN(visit_detail_start_datetime::timestamp) AS visit_detail_start_datetime,
-                                                    MAX(visit_detail_end_datetime::timestamp) AS visit_detail_end_datetime,
+                                            (SELECT MIN(visit_detail_start_datetime) AS visit_detail_start_datetime,
+                                                    MAX(visit_detail_end_datetime) AS visit_detail_end_datetime,
                                                     visit_occurrence_id
-                                            FROM omop_03082021.visit_detail
+                                            FROM visit_detail
                                             GROUP BY visit_occurrence_id) c
                                             ON a.visit_occurrence_id=c.visit_occurrence_id
-                                            LEFT JOIN omop_03082021.concept d
+                                            LEFT JOIN concept d
                                             ON a.dose_unit_concept_id=d.concept_id
-                                    WHERE ((a.drug_exposure_start_datetime::timestamp  >= c.visit_detail_start_datetime::timestamp) AND (a.drug_exposure_start_datetime::timestamp  <= c.visit_detail_end_datetime::timestamp))")
+                                    WHERE (DATEDIFF(minute, c.visit_detail_start_datetime, drug_exposure_start_datetime) >= 0 AND DATEDIFF(minute, drug_exposure_start_datetime, c.visit_detail_end_datetime) >= 0)")
 
 
-copd_drugFigure1Pat <- dbGetQuery(copd, drugs_query_patients)
-
-coag_drugFigure1Pat <- dbGetQuery(coag, drugs_query_patients)
-
-vent_drugFigure1Pat <- dbGetQuery(vent, drugs_query_patients)
-
-news2_drugFigure1Pat <- dbGetQuery(news2, drugs_query_patients)
-
-#Append all DECOVID's research questions together
-omop_drugFigure1Pat <- rbind(copd_drugFigure1Pat, coag_drugFigure1Pat, vent_drugFigure1Pat, news2_drugFigure1Pat) %>%
+omop_drugFigure1Pat <- dbGetQuery(db, drugs_query_patients) %>%
                         distinct()
 
 #Dexamethasone
@@ -220,18 +162,12 @@ ggsave("Procedures_Figure1b.png", width=12, height=3)
 visitd_query_patients <- paste0(paste("SELECT a.*,
                                         b.visit_start_datetime,
                                         b.visit_end_datetime
-                                    FROM omop_03082021.visit_detail a
-                                    LEFT JOIN omop_03082021.visit_occurrence b
+                                    FROM visit_detail a
+                                    LEFT JOIN visit_occurrence b
                                     ON a.visit_occurrence_id=b.visit_occurrence_id
                                     WHERE a.visit_occurrence_id=", visit_occurrence_id_interest))
 
-copd_visFigure1Pat <- dbGetQuery(copd, visitd_query_patients)
-coag_visFigure1Pat <- dbGetQuery(coag, visitd_query_patients)
-vent_visFigure1Pat <- dbGetQuery(vent,visitd_query_patients)
-news2_visFigure1Pat <- dbGetQuery(news2, visitd_query_patients)
-
-#Combine results from all research questions
-omop_visdFigure1Pat <- rbind(copd_visFigure1Pat, coag_visFigure1Pat, vent_visFigure1Pat, news2_visFigure1Pat) %>%
+omop_visdFigure1Pat <- dbGetQuery(db, visitd_query_patients) %>%
                         distinct() %>%
                         select(visit_detail_start_datetime, visit_detail_end_datetime, care_site_id)
 

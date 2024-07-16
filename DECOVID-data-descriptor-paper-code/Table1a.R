@@ -19,84 +19,51 @@ library(plyr) #for carrying observations forward for BMI
 library(zoo) #for carrying observations forward for BMI
 library(reshape2) #For reshaping data
 
-#Enter log-in information for the database
-port <- rstudioapi::askForPassword(prompt="Please enter port")
-user <- rstudioapi::askForPassword(prompt="Please enter username")
-pw <- rstudioapi::askForPassword(prompt="Please enter password")
+#Enter information for the database
+host <- rstudioapi::askForPassword(prompt="Please enter server/host")
+database <- rstudioapi::askForPassword(prompt="Please enter database name")
 
-vent <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,  
-  password=pw,
-  dbname='ventilation'
+db <- DBI::dbConnect(
+  odbc::odbc(),
+  driver="ODBC Driver 17 for SQL Server",
+  Authentication="ActiveDirectoryInteractive",
+  server=host,
+  database=database
 )
-print("STATUS: connected to ventilation")
-
-copd <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='copd'
-)
-print("STATUS: connected to copd")
-
-coag <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user, 
-  password=pw,
-  dbname='coagthrombo'
-)
-print("STATUS: connected to coagthrombo")
-
-news2 <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='news2'
-)
-print("STATUS: connected to news2")
-
+print("STATUS: connected to database")
 
 #This is the query used to extract COVID cases
-covid_pcr_query <- paste("SELECT visit_occurrence_id 
+covid_pcr_query <- paste("SELECT a.visit_occurrence_id
                         FROM
                         (SELECT visit_occurrence_id,
-                                measurement_id AS fact_id_1 
-                                FROM omop_03082021.measurement
+                                measurement_id AS fact_id_1
+                                FROM measurement
                                 WHERE (measurement_concept_id=37310255)
                                 AND (value_as_concept_id=37310282)) a
                         INNER JOIN
-                        (SELECT fact_id_1, 
-                              fact_id_2 as specimen_id 
-                              FROM omop_03082021.fact_relationship
+                        (SELECT fact_id_1,
+                              fact_id_2 as specimen_id
+                              FROM fact_relationship
                         WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        USING (fact_id_1)
+                        ON (a.fact_id_1 = b.fact_id_1)
                         INNER JOIN
-                        (SELECT specimen_id, 
+                        (SELECT specimen_id,
                                 specimen_date
-                                FROM omop_03082021.specimen) c
-                        USING (specimen_id)
+                                FROM specimen) c
+                        ON (b.specimen_id = c.specimen_id)
                         INNER JOIN
-                        (SELECT visit_occurrence_id, 
-                                visit_start_date, 
+                        (SELECT visit_occurrence_id,
+                                visit_start_date,
                                 visit_end_date
-                                FROM omop_03082021.visit_occurrence) d
-                        USING (visit_occurrence_id)
-                        WHERE ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (specimen_date <=visit_end_date)) 
-                        OR ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                FROM visit_occurrence) d
+                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
+                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
+                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT visit_occurrence_id
+covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
                               FROM
-                              (SELECT * FROM omop_03082021.condition_occurrence
+                              (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
@@ -104,55 +71,20 @@ covid_obs_all_query <- paste("SELECT visit_occurrence_id
                               INNER JOIN (SELECT visit_start_date,
                                                  visit_end_date,
                                                  visit_occurrence_id
-                                                 FROM omop_03082021.visit_occurrence) b
-                              USING (visit_occurrence_id)
-                              WHERE ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (condition_start_date <=visit_end_date))
-                              OR ((condition_start_date >= visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
-
+                                                 FROM visit_occurrence) b
+                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
+                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
+                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
-copd_covid_pcr <- dbGetQuery(copd, covid_pcr_query) %>%
-                  distinct()
-
-coag_covid_pcr <- dbGetQuery(coag, covid_pcr_query) %>%
-                  distinct()
-
-vent_covid_pcr <- dbGetQuery(vent, covid_pcr_query) %>%
-                  distinct()
-
-news2_covid_pcr <- dbGetQuery(news2, covid_pcr_query) %>%
-                  distinct()
-
-#Append all of the cases from all of DECOVID's research question databases, and remove duplicates using distinct()
-omop_covid_pcr <-   rbind(copd_covid_pcr, coag_covid_pcr, vent_covid_pcr, news2_covid_pcr) %>%
-                    distinct()
-
+omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+  distinct()
 
 #Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
 #is used to remove duplicates
-copd_covid_all <- copd_covid_pcr %>%
-                    rbind(dbGetQuery(copd, covid_obs_all_query)) %>%
-                    distinct()
-
-coag_covid_all <- coag_covid_pcr %>%
-                    rbind(dbGetQuery(coag, covid_obs_all_query)) %>%
-                    distinct()
-
-vent_covid_all <- vent_covid_pcr %>%
-                   rbind(dbGetQuery(vent, covid_obs_all_query)) %>%
-                   distinct()
-
-news2_covid_all <- news2_covid_pcr %>%
-                    rbind(dbGetQuery(news2, covid_obs_all_query)) %>%
-                    distinct()
-
-#Append all of the cases from all of DECOVID's research question databases, and remove duplicates using distinct()
-omop_covid_all <-   rbind(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all) %>%
-                    distinct()
-
-#remove individual research question dataframes
-rm(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all,
-   copd_covid_pcr, coag_covid_pcr, vent_covid_pcr, news2_covid_pcr)
+omop_covid_all <- omop_covid_pcr %>%
+  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  distinct()
 
 #Before proceeding, specify the COVID-19 case type the data summaries should be based on.
 #In the DECOVID Data Descriptor paper, the omop_covid_all cases are used.
@@ -163,7 +95,7 @@ covid_case_type <- omop_covid_all
 #First, start with querying variables available in DECOVID's visit_occurrence table that are summarized
 #in Table 1. This is primarily for the visit-level summaries
 visit_query <- paste0("SELECT visit_occurrence_id,
-                              person_id,
+                              a.person_id,
                               gender_concept_name,
                               race_concept_name,
                               year_of_birth,
@@ -180,78 +112,51 @@ visit_query <- paste0("SELECT visit_occurrence_id,
                                       visit_end_date,
                                       admitting_source_concept_id,
                                       discharge_to_concept_id,
-                             (DATE_PART('day', visit_end_datetime::timestamp - visit_start_datetime::timestamp) +
-                              DATE_PART('hour', visit_end_datetime::timestamp - visit_start_datetime::timestamp) /24 +
-                              DATE_PART('minute', visit_end_datetime::timestamp - visit_start_datetime::timestamp) / 1440) AS patient_days,
+                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 1440) AS patient_days,
                               visit_occurrence_id %10 AS hospital_site
-                              FROM omop_03082021.visit_occurrence) a
+                              FROM visit_occurrence) a
                               LEFT JOIN
                               (SELECT gender_concept_id,
                                       race_concept_id,
                                       person_id,
                                       year_of_birth
-                              FROM omop_03082021.person) b
-                              USING (person_id)
+                              FROM person) b
+                              ON (a.person_id = b.person_id)
                               LEFT JOIN
                               (SELECT concept_id as gender_concept_id,
                                       concept_name as gender_concept_name
-                                FROM omop_03082021.concept) c
-                                USING (gender_concept_id)
+                                FROM concept) c
+                                ON (b.gender_concept_id = c.gender_concept_id)
                                LEFT JOIN
                               (SELECT concept_id as race_concept_id,
                                       concept_name as race_concept_name
-                              FROM omop_03082021.concept) d
-                                USING (race_concept_id)
+                              FROM concept) d
+                                ON (b.race_concept_id = d.race_concept_id)
                               LEFT JOIN
                               (SELECT concept_id as discharge_to_concept_id,
                                      concept_name as discharge_to_concept_name
-                              FROM omop_03082021.concept) e
-                              USING (discharge_to_concept_id)
+                              FROM concept) e
+                              ON (a.discharge_to_concept_id = e.discharge_to_concept_id)
                               LEFT JOIN
                               (SELECT concept_id as admitting_source_concept_id,
                                       concept_name as admitting_source_concept_name
-                              FROM omop_03082021.concept) f
-                              USING (admitting_source_concept_id)")
+                              FROM concept) f
+                              ON (a.admitting_source_concept_id = f.admitting_source_concept_id)")
 
 #Again, we have to query each of DECOVID's research question databases separately. Here,
 #we do not need to remove duplicates at this stage.
-copd_visit <- dbGetQuery(copd, visit_query)
-
-coag_visit <- dbGetQuery(coag, visit_query)
-
-vent_visit <- dbGetQuery(vent, visit_query)
-
-news2_visit <- dbGetQuery(news2, visit_query)
-
-#Append all research questions together. Here, we avoid duplicates by joining on all
-#variables rather than use distinct().
-omop_visit_all <-  list(copd_visit, coag_visit, vent_visit, news2_visit) %>%
-                    plyr::join_all(by="visit_occurrence_id", type="full", match="all") %>%
-                    mutate(covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"))
-
-#remove individual research question dataframes
-rm(copd_visit, coag_visit, vent_visit, news2_visit)
+omop_visit_all <- dbGetQuery(db, visit_query) %>%
+               mutate(covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"))
 
 #visit_detail query - this is to identity the level of care for each visit, as the
 visit_detail_query <- paste0("SELECT care_site_id, visit_occurrence_id FROM
-                             omop_03082021.visit_detail")
+                             visit_detail")
 
-copd_care <- dbGetQuery(copd, visit_detail_query)
-coag_care <- dbGetQuery(coag, visit_detail_query)
-vent_care <- dbGetQuery(vent, visit_detail_query)
-news2_care <- dbGetQuery(news2, visit_detail_query)
-
-#Append the visit_detail data extracts from each research question database query,
-#removing duplicates.
-omop_care <-  rbind(copd_care, coag_care, vent_care, news2_care) %>%
+omop_care <- dbGetQuery(db, visit_detail_query) %>%
                     distinct() %>%
                     #the care_site_id values are integer64, which sometimes has issues, so convert to numeric, but
                     #first convert the integer64 to character.
                     mutate(care_site_id=as.numeric(as.character(care_site_id)))
-
-
-#remove individual research question dataframes
-rm(copd_care, coag_care, vent_care, news2_care)
 
 #The condition_occurrence table is now queried, as this is used for the visit-level summaries.
 condition_q <- paste0("SELECT a.*,
@@ -260,28 +165,15 @@ condition_q <- paste0("SELECT a.*,
                               b.concept_name,
                               c.concept_id AS concept_id_specific,
                               c.concept_name AS concept_name_specific
-                      FROM omop_03082021.condition_occurrence a
-                      LEFT JOIN omop_03082021.concept  b
+                      FROM condition_occurrence a
+                      LEFT JOIN concept  b
                       ON a.condition_type_concept_id=b.concept_id
-                      LEFT JOIN omop_03082021.concept  c
+                      LEFT JOIN concept  c
                       ON a.condition_concept_id=c.concept_id")
 
 
-copd_condition_q <- dbGetQuery(copd, condition_q)
-
-coag_condition_q <- dbGetQuery(coag, condition_q)
-
-vent_condition_q <- dbGetQuery(vent, condition_q)
-
-news2_condition_q <- dbGetQuery(news2, condition_q)
-
-#Append the condition_occurrence data extracts from each research question database query,
-#removing duplicates.
-omop_cond_all <- rbind(copd_condition_q, coag_condition_q, vent_condition_q, news2_condition_q) %>%
+omop_cond_all <- dbGetQuery(db, condition_q) %>%
                  distinct()
-
-#remove individual research question dataframes
-rm(copd_condition_q,coag_condition_q,vent_condition_q,news2_condition_q)
 
 #Let's create a copy of the omop_visit_all as a primary table
 #of all visit_occurrence_ids for the condition summary
@@ -326,38 +218,25 @@ drug_q <- paste0("SELECT a.*,
                          c.drug_type_concept_name,
                          c.concept_class_id_drug_type,
                          c.vocabulary_id_drug_type
-                      FROM omop_03082021.drug_exposure a
+                      FROM drug_exposure a
                       LEFT JOIN
                       (SELECT concept_id as drug_concept_id_ctable,
                               concept_name as drug_concept_name,
                               concept_class_id as concept_class_id_drug,
                               vocabulary_id as vocabulary_id_drug
-                       FROM omop_03082021.concept) b
+                       FROM concept) b
                       ON a.drug_concept_id=b.drug_concept_id_ctable
                       LEFT JOIN
                       (SELECT concept_id as drug_type_concept_id_ctable,
                               concept_name as drug_type_concept_name,
                               concept_class_id as concept_class_id_drug_type,
                               vocabulary_id as vocabulary_id_drug_type
-                       FROM omop_03082021.concept) c
+                       FROM concept) c
                       ON a.drug_type_concept_id=c.drug_type_concept_id_ctable")
 
 
-copd_drug_q <- dbGetQuery(copd, drug_q)
-
-coag_drug_q <- dbGetQuery(coag, drug_q)
-
-vent_drug_q <- dbGetQuery(vent, drug_q)
-
-news2_drug_q <- dbGetQuery(news2, drug_q)
-
-#Append the drug_exposure data extracts from each research question database query,
-#removing duplicates.
-omop_drug_all <- rbind(copd_drug_q, coag_drug_q, vent_drug_q, news2_drug_q) %>%
+omop_drug_all <- dbGetQuery(db, drug_q) %>%
                   distinct()
-
-#remove individual research question dataframes
-rm(copd_drug_q, coag_drug_q, vent_drug_q, news2_drug_q)
 
 ###Now let's load the concept relationship table.
 #The purpose for this code is to find locate
@@ -366,21 +245,21 @@ rm(copd_drug_q, coag_drug_q, vent_drug_q, news2_drug_q)
 
 #Load concept relationship table
 concept_relationship_q <- paste0("SELECT *
-                                 FROM omop_03082021.concept_relationship")
+                                 FROM concept_relationship")
 
-concept_relationship_table <- dbGetQuery(copd, concept_relationship_q)
+concept_relationship_table <- dbGetQuery(db, concept_relationship_q)
 
 #Load ancestor table
 concept_ancestor_q <- paste0("SELECT *
-                                FROM omop_03082021.concept_ancestor")
+                                FROM concept_ancestor")
 
-concept_ancestor_table <- dbGetQuery(copd, concept_ancestor_q)
+concept_ancestor_table <- dbGetQuery(db, concept_ancestor_q)
 
 #Load concept table
 concept_q <- paste0("SELECT *
-                     FROM omop_03082021.concept")
+                     FROM concept")
 
-concept <- dbGetQuery(copd, concept_q)
+concept <- dbGetQuery(db, concept_q)
 
 #Translate non-standard to standard
 concept_relationship_table_standard <- concept_relationship_table %>%
@@ -475,39 +354,27 @@ BMI_query <- paste("SELECT b.visit_occurrence_id,
                            visit_end_datetime,
                            measurement_datetime,
                               value_as_number,
-                              unit_concept_id,
+                              a.unit_concept_id,
                               unit
                               FROM
                       (SELECT *
-                      FROM omop_03082021.measurement
+                      FROM measurement
                       WHERE measurement_concept_id IN ('3036277', '3025315')) a
                       INNER JOIN
                       (SELECT visit_start_datetime,
                               visit_end_datetime,
                               visit_occurrence_id
-                      FROM omop_03082021.visit_occurrence) b
-                      USING (visit_occurrence_id)
+                      FROM visit_occurrence) b
+                      ON (a.visit_occurrence_id = b.visit_occurrence_id)
                       LEFT JOIN (SELECT concept_id as unit_concept_id,
                                         concept_name as unit
-                      FROM omop_03082021.concept) c
-                      USING (unit_concept_id)
+                      FROM concept) c
+                      ON (a.unit_concept_id = c.unit_concept_id)
                       WHERE ((measurement_datetime>=visit_start_datetime) AND (measurement_datetime<=visit_end_datetime))")
 
 
-BMI_copd <- dbGetQuery(copd, BMI_query) %>%
+omop_BMI_table <- dbGetQuery(db, BMI_query) %>%
             distinct()
-
-BMI_coag <- dbGetQuery(coag, BMI_query) %>%
-            distinct()
-
-BMI_vent <- dbGetQuery(vent, BMI_query) %>%
-            distinct()
-
-BMI_news2 <- dbGetQuery(news2, BMI_query) %>%
-            distinct()
-
-omop_BMI_table <- rbind(BMI_copd, BMI_coag, BMI_vent, BMI_news2) %>%
-                  distinct()
 
 #Select only necessary columns and reshape the data to wide format
 #such that weight and height taken at the same time
@@ -700,47 +567,38 @@ person_level_table <- paste0("SELECT a.person_id %10 as hospital_site,
                                      race_concept_id,
                                      gender_concept_id,
                                      location_id
-                             FROM omop_03082021.person) a
+                             FROM person) a
                              LEFT JOIN
                              (SELECT person_id,
                                      COUNT(visit_occurrence_id) as visit_count
-                             FROM  omop_03082021.visit_occurrence
+                             FROM  visit_occurrence
                              GROUP BY person_id) b
                              ON a.person_id=b.person_id
                              LEFT JOIN
                              (SELECT concept_id as gender_concept_id,
                                       concept_name as gender_concept_name
-                              FROM omop_03082021.concept) c
+                              FROM concept) c
                               ON a.gender_concept_id=c.gender_concept_id
                                LEFT JOIN
                              (SELECT concept_id as race_concept_id,
                                       concept_name as race_concept_name
-                              FROM omop_03082021.concept) d
+                              FROM concept) d
                               ON a.race_concept_id=d.race_concept_id
                               LEFT JOIN
                              (SELECT location_id,
                                       zip as LSOA_code
-                              FROM omop_03082021.location) e
+                              FROM location) e
                              ON a.location_id=e.location_id
                              LEFT JOIN
                              (SELECT  DISTINCT person_id,
                                       COUNT(DISTINCT person_id) as COVID
-                             FROM omop_03082021.visit_occurrence
+                             FROM visit_occurrence
                              WHERE visit_occurrence_id IN (",paste0(paste0("'", covid_case_type %>%pull(visit_occurrence_id), "'", collapse=",")), ")
                              GROUP BY person_id) f
                              ON a.person_id=f.person_id")
 
 
-copd_person_level <- dbGetQuery(copd, person_level_table)
-
-coag_person_level <- dbGetQuery(coag, person_level_table)
-
-vent_person_level <- dbGetQuery(vent, person_level_table)
-
-news2_person_level <- dbGetQuery(news2, person_level_table)
-
-#Append all four research questions together
-omop_person_table <- rbind(copd_person_level, coag_person_level, vent_person_level, news2_person_level) %>%
+omop_person_table <- dbGetQuery(db, person_level_table) %>%
                       distinct() %>%
                       mutate(gender_concept_name=tolower(gender_concept_name) %>% Hmisc::capitalize(),
                               gender_concept_name=ifelse(gender_concept_name=="Unknown" | gender_concept_name=="No matching concept", "Unknown", gender_concept_name),

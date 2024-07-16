@@ -12,132 +12,87 @@ library(aweek)
 #with new data.
 
 #PCR
-covid_pcr_query <- paste("SELECT visit_occurrence_id
+covid_pcr_query <- paste("SELECT a.visit_occurrence_id
                         FROM
                         (SELECT visit_occurrence_id,
                                 measurement_id AS fact_id_1
-                                FROM omop_03082021.measurement
+                                FROM measurement
                                 WHERE (measurement_concept_id=37310255)
                                 AND (value_as_concept_id=37310282)) a
                         INNER JOIN
                         (SELECT fact_id_1,
                               fact_id_2 as specimen_id
-                              FROM omop_03082021.fact_relationship
+                              FROM fact_relationship
                         WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        USING (fact_id_1)
+                        ON (a.fact_id_1 = b.fact_id_1)
                         INNER JOIN
                         (SELECT specimen_id,
-                                specimen_datetime
-                                FROM omop_03082021.specimen) c
-                        USING (specimen_id)
+                                specimen_date
+                                FROM specimen) c
+                        ON (b.specimen_id = c.specimen_id)
                         INNER JOIN
                         (SELECT visit_occurrence_id,
-                                visit_start_datetime,
-                                visit_end_datetime
-                                FROM omop_03082021.visit_occurrence) d
-                        USING (visit_occurrence_id)
-                        WHERE (specimen_datetime >=visit_start_datetime - INTERVAL'14 day' AND specimen_datetime <=visit_end_datetime)
-                        OR (specimen_datetime >=visit_start_datetime - INTERVAL'14 day' AND visit_end_datetime IS NULL)")
+                                visit_start_date,
+                                visit_end_date
+                                FROM visit_occurrence) d
+                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
+                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
+                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT visit_occurrence_id
+covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
                               FROM
-                              (SELECT * FROM omop_03082021.condition_occurrence
+                              (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
                               320651, 37310268)) a
-                              INNER JOIN (SELECT visit_start_datetime,
-                                                 visit_end_datetime,
+                              INNER JOIN (SELECT visit_start_date,
+                                                 visit_end_date,
                                                  visit_occurrence_id
-                                                 FROM omop_03082021.visit_occurrence) b
-                              USING (visit_occurrence_id)
-                              WHERE (condition_start_datetime >=visit_start_datetime - INTERVAL'14 day' AND condition_start_datetime <=visit_end_datetime)
-                              OR (condition_start_datetime >=visit_start_datetime - INTERVAL'14 day' AND visit_end_datetime IS NULL)")
+                                                 FROM visit_occurrence) b
+                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
+                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
+                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 
 #Run PCR Only Queries
-copd_covid_pcr <- dbGetQuery(copd, covid_pcr_query) %>%
-  distinct()
-
-coag_covid_pcr <- dbGetQuery(coag, covid_pcr_query) %>%
-  distinct()
-
-vent_covid_pcr <- dbGetQuery(vent, covid_pcr_query) %>%
-  distinct()
-
-news2_covid_pcr <- dbGetQuery(news2, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
-copd_covid_all <- copd_covid_pcr %>%
-  rbind(dbGetQuery(copd, covid_obs_all_query)) %>%
+omop_covid_all <- omop_covid_pcr %>%
+  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
   distinct()
 
-coag_covid_all <- coag_covid_pcr %>%
-  rbind(dbGetQuery(coag, covid_obs_all_query)) %>%
-  distinct()
-
-vent_covid_all <- vent_covid_pcr %>%
-  rbind(dbGetQuery(vent, covid_obs_all_query)) %>%
-  distinct()
-
-news2_covid_all <- news2_covid_pcr %>%
-  rbind(dbGetQuery(news2, covid_obs_all_query)) %>%
-  distinct()
-
-#Combine all research questions.
-omop_covid_all <-   rbind(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all) %>%
-  distinct()
-
-visit_query_org <- paste0("SELECT visit_occurrence_id, person_id, gender_concept_name, race_concept_name, year_of_birth, hospital_site, visit_start_date, visit_end_date, admitting_source_concept_name, discharge_to_concept_name, patient_days FROM
+visit_query_org <- paste0("SELECT visit_occurrence_id, a.person_id, gender_concept_name, race_concept_name, year_of_birth, hospital_site, visit_start_date, visit_end_date, admitting_source_concept_name, discharge_to_concept_name, patient_days FROM
                         (SELECT visit_occurrence_id, person_id, visit_start_date, visit_end_date, admitting_source_concept_id, discharge_to_concept_id,
-                        (DATE_PART('day', visit_end_datetime::timestamp - visit_start_datetime::timestamp) +
-                        DATE_PART('hour', visit_end_datetime::timestamp - visit_start_datetime::timestamp) /24 +
-                        DATE_PART('minute', visit_end_datetime::timestamp - visit_start_datetime::timestamp) / 1440) AS patient_days,
+                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 1440) AS patient_days,
                         visit_occurrence_id %10 AS hospital_site
-                        FROM omop_03082021.visit_occurrence) a
+                        FROM visit_occurrence) a
                         LEFT JOIN
                         (SELECT gender_concept_id, race_concept_id, person_id, year_of_birth
-                          FROM omop_03082021.person) b
-                          USING (person_id)
+                          FROM person) b
+                          ON (a.person_id = b.person_id)
                         LEFT JOIN
                         (SELECT concept_id as gender_concept_id, concept_name as gender_concept_name
-                          FROM omop_03082021.concept) c
-                          USING (gender_concept_id)
+                          FROM concept) c
+                          ON (b.gender_concept_id = c.gender_concept_id)
                         LEFT JOIN
                         (SELECT concept_id as race_concept_id, concept_name as race_concept_name
-                          FROM omop_03082021.concept) d
-                          USING (race_concept_id)
+                          FROM concept) d
+                          ON (b.race_concept_id = d.race_concept_id)
                         LEFT JOIN
                         (SELECT concept_id as discharge_to_concept_id, concept_name as
-                          discharge_to_concept_name FROM omop_03082021.concept) e
-                        USING (discharge_to_concept_id)
+                          discharge_to_concept_name FROM concept) e
+                        ON (a.discharge_to_concept_id = e.discharge_to_concept_id)
                         LEFT JOIN
                         (SELECT concept_id as admitting_source_concept_id, concept_name as
-                          admitting_source_concept_name FROM omop_03082021.concept) f
-                        USING (admitting_source_concept_id)")
+                          admitting_source_concept_name FROM concept) f
+                        ON (a.admitting_source_concept_id = f.admitting_source_concept_id)")
 
 
-copd_visit_org <- dbGetQuery(copd, visit_query_org)
-paste("STATUS: information for", nrow(copd_visit_org), "visits extracted from copd")
-
-coag_visit_org <- dbGetQuery(coag, visit_query_org)
-paste("STATUS: information for", nrow(coag_visit_org), "visits extracted from coagthrombo")
-
-vent_visit_org <- dbGetQuery(vent, visit_query_org)
-paste("STATUS: information for", nrow(vent_visit_org), "visits extracted from ventilation")
-
-news2_visit_org <- dbGetQuery(news2, visit_query_org)
-paste("STATUS: information for", nrow(news2_visit_org), "visits extracted from news2")
-
-#Create pipe message function so code easier to debug
-pipe_message=function(.data, status){message(status); .data}
-
-
-omop_visit_all_org <-
-  list(copd_visit_org, coag_visit_org, vent_visit_org, news2_visit_org) %>%
-  plyr::join_all(by="visit_occurrence_id", type="full", match="all") %>%
+omop_visit_all_org <- dbGetQuery(db, visit_query_org) %>%
   mutate(covid=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"))
 
 
@@ -214,15 +169,9 @@ omop_visit_clean_all_org <- omop_visit_all_org %>%
   mutate_at(c("patient_days"),
             as.numeric)
 
-omop_care <-
-  rbind(copd_care, coag_care, vent_care, news2_care) %>%
-  distinct() %>%
-  mutate(care_site_id=as.numeric(care_site_id))
-
-
 #Load in visit data
 visit_query <- paste0("SELECT visit_occurrence_id,
-                              person_id,
+                              a.person_id,
                               gender_concept_name,
                               race_concept_name,
                               year_of_birth,
@@ -239,70 +188,50 @@ visit_query <- paste0("SELECT visit_occurrence_id,
                                       visit_end_date,
                                       admitting_source_concept_id,
                                       discharge_to_concept_id,
-                              (DATE_PART('day',
-                              visit_end_datetime::timestamp - visit_start_datetime::timestamp)*24 +
-                              DATE_PART('hour', visit_end_datetime::timestamp - visit_start_datetime::timestamp) +
-                              DATE_PART('minute', visit_end_datetime::timestamp - visit_start_datetime::timestamp) / 60) AS patient_hours,
+                              (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 60) AS patient_hours,
                               visit_occurrence_id %10 AS hospital_site
-                              FROM omop_03082021.visit_occurrence) a
+                              FROM visit_occurrence) a
                               LEFT JOIN
                               (SELECT gender_concept_id,
                                       race_concept_id,
                                       person_id,
                                       year_of_birth
-                              FROM omop_03082021.person) b
-                              USING (person_id)
+                              FROM person) b
+                              ON (a.person_id = b.person_id)
                               LEFT JOIN
                               (SELECT concept_id as gender_concept_id,
                                       concept_name as gender_concept_name
-                                FROM omop_03082021.concept) c
-                                USING (gender_concept_id)
+                                FROM concept) c
+                                ON (b.gender_concept_id = c.gender_concept_id)
                                LEFT JOIN
                               (SELECT concept_id as race_concept_id,
                                       concept_name as race_concept_name
-                              FROM omop_03082021.concept) d
-                                USING (race_concept_id)
+                              FROM concept) d
+                                ON (b.race_concept_id = d.race_concept_id)
                               LEFT JOIN
                               (SELECT concept_id as discharge_to_concept_id,
                                      concept_name as discharge_to_concept_name
-                              FROM omop_03082021.concept) e
-                              USING (discharge_to_concept_id)
+                              FROM concept) e
+                              ON (a.discharge_to_concept_id = e.discharge_to_concept_id)
                               LEFT JOIN
                               (SELECT concept_id as admitting_source_concept_id,
                                       concept_name as admitting_source_concept_name
-                              FROM omop_03082021.concept) f
-                              USING (admitting_source_concept_id)")
+                              FROM concept) f
+                              ON (a.admitting_source_concept_id = f.admitting_source_concept_id)")
 
-copd_visit <- dbGetQuery(copd, visit_query)
-paste("STATUS: information for", nrow(copd_visit), "visits extracted from copd")
-
-coag_visit <- dbGetQuery(coag, visit_query)
-paste("STATUS: information for", nrow(coag_visit), "visits extracted from coagthrombo")
-
-vent_visit <- dbGetQuery(vent, visit_query)
-paste("STATUS: information for", nrow(vent_visit), "visits extracted from ventilation")
-
-news2_visit <- dbGetQuery(news2, visit_query)
-paste("STATUS: information for", nrow(news2_visit), "visits extracted from news2")
+omop_visit_all <- dbGetQuery(db, visit_query)
 
 #Care Site query
 care_site_query <- paste0("SELECT care_site_id, visit_occurrence_id FROM
-                          omop_03082021.visit_detail")
+                          visit_detail")
 
-copd_care <- dbGetQuery(copd, care_site_query)
-coag_care <- dbGetQuery(coag, care_site_query)
-vent_care <- dbGetQuery(vent, care_site_query)
-news2_care <- dbGetQuery(news2, care_site_query)
-
-omop_care <-
-  rbind(copd_care, coag_care, vent_care, news2_care) %>%
+omop_care <- dbGetQuery(db, care_site_query) %>%
   distinct() %>%
   mutate(care_site_id=as.numeric(care_site_id))
 
 
 omop_visit_all <-
-  list(copd_visit, coag_visit, vent_visit, news2_visit) %>%
-  plyr::join_all(by="visit_occurrence_id", type="full", match="all") %>%
+  omop_visit_all %>%
   mutate(covid=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"))
 
 paste("Number of visits:", nrow(omop_visit_all), "-", sum(duplicated(omop_visit_all$visit_occurrence_id)), "duplicates")
@@ -421,21 +350,10 @@ CreateTableOne(data=omop_visit_format_all,
 #This is the only we can calculate the number patient days in each level of care
 care_site_query_measurments <- paste0("SELECT * ,
                                       visit_occurrence_id %10 as hospital_site,
-                                      (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                                       DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                       DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) AS patient_days
-                                       FROM omop_03082021.visit_detail")
+                                      DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 AS patient_days
+                                       FROM visit_detail")
 
-copd_care_measurments <- dbGetQuery(copd, care_site_query_measurments)
-
-coag_care_measurments <- dbGetQuery(coag, care_site_query_measurments)
-
-vent_care_measurments <- dbGetQuery(vent, care_site_query_measurments)
-
-news2_care_measurments <- dbGetQuery(news2, care_site_query_measurments)
-
-#Append all four research questions, remove duplicates
-omop_care <-  rbind(copd_care_measurments, coag_care_measurments, vent_care_measurments, news2_care_measurments) %>%
+omop_care <- dbGetQuery(db, care_site_query_measurments) %>%
   distinct() %>%
   mutate(care_site_id=as.character(care_site_id),
          covid=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"),
@@ -467,7 +385,7 @@ meas_q_figs <- paste0("SELECT a.*,
                                 ELSE NULL END) as hospital_site
                       FROM
                       (SELECT *
-                      FROM omop_03082021.measurement
+                      FROM measurement
                       WHERE measurement_concept_id = ",
                  paste0(paste0("'", measurement_nobp_no_resp[i,] %>% pull(measurement_concept_id), "'", collapse="")), " AND visit_occurrence_id IS NOT NULL) a
                       LEFT JOIN
@@ -475,16 +393,11 @@ meas_q_figs <- paste0("SELECT a.*,
                               concept_name as measurement_concept_name,
                               concept_class_id as concept_class_id_measurement,
                                 vocabulary_id as vocabulary_id_measurement
-                       FROM omop_03082021.concept) b
+                       FROM concept) b
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-copd_meas_q <- dbGetQuery(copd, meas_q_figs)
-coag_meas_q <- dbGetQuery(coag, meas_q_figs)
-vent_meas_q <- dbGetQuery(vent, meas_q_figs)
-news2_meas_q <- dbGetQuery(news2, meas_q_figs)
-
-omop_meas_all <- rbind(news2_meas_q, coag_meas_q,vent_meas_q,news2_meas_q) %>%
+omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
                   distinct()
 
 omop_meas_all <- omop_meas_all %>%
@@ -543,7 +456,7 @@ meas_q_figs <- paste0("SELECT a.*,
                                 ELSE NULL END) as hospital_site
                       FROM
                       (SELECT *
-                      FROM omop_03082021.measurement
+                      FROM measurement
                       WHERE measurement_concept_id IN (",
                         paste0(paste0("'", measurement_bp %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL) a
                       LEFT JOIN
@@ -551,16 +464,11 @@ meas_q_figs <- paste0("SELECT a.*,
                               concept_name as measurement_concept_name,
                               concept_class_id as concept_class_id_measurement,
                                 vocabulary_id as vocabulary_id_measurement
-                       FROM omop_03082021.concept) b
+                       FROM concept) b
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-copd_meas_q <- dbGetQuery(copd, meas_q_figs)
-coag_meas_q <- dbGetQuery(coag, meas_q_figs)
-vent_meas_q <- dbGetQuery(vent, meas_q_figs)
-news2_meas_q <- dbGetQuery(news2, meas_q_figs)
-
-omop_meas_all <- rbind(news2_meas_q, coag_meas_q,vent_meas_q,news2_meas_q) %>%
+omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
     distinct()
 
 omop_meas_all <- omop_meas_all %>%
@@ -627,23 +535,18 @@ meas_q_figs <- paste0("SELECT a.*,
                                 ELSE NULL END) as hospital_site
                       FROM
                       (SELECT *
-                      FROM omop_03082021.measurement
+                      FROM measurement
                       WHERE measurement_concept_id IN ('4313591', '4108138', '4154772') AND visit_occurrence_id IS NOT NULL) a
                       LEFT JOIN
                       (SELECT concept_id as measurement_id,
                               concept_name as measurement_concept_name,
                               concept_class_id as concept_class_id_measurement,
                                 vocabulary_id as vocabulary_id_measurement
-                       FROM omop_03082021.concept) b
+                       FROM concept) b
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-copd_meas_q <- dbGetQuery(copd, meas_q_figs)
-coag_meas_q <- dbGetQuery(coag, meas_q_figs)
-vent_meas_q <- dbGetQuery(vent, meas_q_figs)
-news2_meas_q <- dbGetQuery(news2, meas_q_figs)
-
-omop_meas_all <- rbind(news2_meas_q, coag_meas_q,vent_meas_q,news2_meas_q) %>%
+omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
   distinct()
 
 omop_meas_all <- omop_meas_all %>%

@@ -14,84 +14,52 @@ library(Hmisc) #for describing variables
 library(purrr) #for data manipulation
 library(reshape2) #for use of dcast
 
-#Enter log-in information for the database
-port <- rstudioapi::askForPassword(prompt="Please enter port")
-user <- rstudioapi::askForPassword(prompt="Please enter username")
-pw <- rstudioapi::askForPassword(prompt="Please enter password")
+#Enter information for the database
+host <- rstudioapi::askForPassword(prompt="Please enter server/host")
+database <- rstudioapi::askForPassword(prompt="Please enter database name")
 
-vent <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='ventilation'
+db <- DBI::dbConnect(
+  odbc::odbc(),
+  driver="ODBC Driver 17 for SQL Server",
+  Authentication="ActiveDirectoryInteractive",
+  server=host,
+  database=database
 )
-print("STATUS: connected to ventilation")
-
-copd <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='copd'
-)
-print("STATUS: connected to copd")
-
-coag <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='coagthrombo'
-)
-print("STATUS: connected to coagthrombo")
-
-news2 <- DBI::dbConnect(
-  RPostgres::Postgres(),
-  host=rstudioapi::askForPassword(prompt="Please enter host"),
-  port=port,
-  user=user,
-  password=pw,
-  dbname='news2'
-)
-print("STATUS: connected to news2")
+print("STATUS: connected to database")
 
 
 #This is the query used to extract COVID cases
-covid_pcr_query <- paste("SELECT visit_occurrence_id
+covid_pcr_query <- paste("SELECT a.visit_occurrence_id
                         FROM
                         (SELECT visit_occurrence_id,
                                 measurement_id AS fact_id_1
-                                FROM omop_03082021.measurement
+                                FROM measurement
                                 WHERE (measurement_concept_id=37310255)
                                 AND (value_as_concept_id=37310282)) a
                         INNER JOIN
                         (SELECT fact_id_1,
                               fact_id_2 as specimen_id
-                              FROM omop_03082021.fact_relationship
+                              FROM fact_relationship
                         WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        USING (fact_id_1)
+                        ON (a.fact_id_1 = b.fact_id_1)
                         INNER JOIN
                         (SELECT specimen_id,
                                 specimen_date
-                                FROM omop_03082021.specimen) c
-                        USING (specimen_id)
+                                FROM specimen) c
+                        ON (b.specimen_id = c.specimen_id)
                         INNER JOIN
                         (SELECT visit_occurrence_id,
                                 visit_start_date,
                                 visit_end_date
-                                FROM omop_03082021.visit_occurrence) d
-                        USING (visit_occurrence_id)
-                        WHERE ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (specimen_date <=visit_end_date))
-                        OR ((specimen_date >=visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                FROM visit_occurrence) d
+                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
+                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
+                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT visit_occurrence_id
+covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
                               FROM
-                              (SELECT * FROM omop_03082021.condition_occurrence
+                              (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
@@ -99,55 +67,21 @@ covid_obs_all_query <- paste("SELECT visit_occurrence_id
                               INNER JOIN (SELECT visit_start_date,
                                                  visit_end_date,
                                                  visit_occurrence_id
-                                                 FROM omop_03082021.visit_occurrence) b
-                              USING (visit_occurrence_id)
-                              WHERE ((condition_start_date >=visit_start_date - INTERVAL'14 day') AND (condition_start_date <=visit_end_date))
-                              OR ((condition_start_date >= visit_start_date - INTERVAL'14 day') AND (visit_end_date IS NULL))")
+                                                 FROM visit_occurrence) b
+                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
+                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
+                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
-copd_covid_pcr <- dbGetQuery(copd, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
   distinct()
-
-coag_covid_pcr <- dbGetQuery(coag, covid_pcr_query) %>%
-  distinct()
-
-vent_covid_pcr <- dbGetQuery(vent, covid_pcr_query) %>%
-  distinct()
-
-news2_covid_pcr <- dbGetQuery(news2, covid_pcr_query) %>%
-  distinct()
-
-#Append all of the cases from all of DECOVID's research question databases, and remove duplicates using distinct()
-omop_covid_pcr <-   rbind(copd_covid_pcr, coag_covid_pcr, vent_covid_pcr, news2_covid_pcr) %>%
-  distinct()
-
 
 #Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
 #is used to remove duplicates
-copd_covid_all <- copd_covid_pcr %>%
-  rbind(dbGetQuery(copd, covid_obs_all_query)) %>%
+omop_covid_all <- omop_covid_pcr %>%
+  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
   distinct()
-
-coag_covid_all <- coag_covid_pcr %>%
-  rbind(dbGetQuery(coag, covid_obs_all_query)) %>%
-  distinct()
-
-vent_covid_all <- vent_covid_pcr %>%
-  rbind(dbGetQuery(vent, covid_obs_all_query)) %>%
-  distinct()
-
-news2_covid_all <- news2_covid_pcr %>%
-  rbind(dbGetQuery(news2, covid_obs_all_query)) %>%
-  distinct()
-
-#Append all of the cases from all of DECOVID's research question databases, and remove duplicates using distinct()
-omop_covid_all <-   rbind(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all) %>%
-  distinct()
-
-#remove individual research question dataframes
-rm(copd_covid_all, coag_covid_all, vent_covid_all, news2_covid_all,
-   copd_covid_pcr, coag_covid_pcr, vent_covid_pcr, news2_covid_pcr)
 
 #Before proceeding, specify the COVID-19 case type the data summaries should be based on.
 #In the DECOVID Data Descriptor paper, the omop_covid_all cases are used.
@@ -170,21 +104,10 @@ covid_case_type <- omop_covid_all
 #This is the only we can calculate the number patient days in each level of care
 care_site_query_measurments <- paste0("SELECT * ,
                                       visit_occurrence_id %10 as hospital_site,
-                                      (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                                       DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                       DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) AS patient_days
-                                       FROM omop_03082021.visit_detail")
+                                      DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 AS patient_days
+                                       FROM visit_detail")
 
-copd_care_measurments <- dbGetQuery(copd, care_site_query_measurments)
-
-coag_care_measurments <- dbGetQuery(coag, care_site_query_measurments)
-
-vent_care_measurments <- dbGetQuery(vent, care_site_query_measurments)
-
-news2_care_measurments <- dbGetQuery(news2, care_site_query_measurments)
-
-#Append all four research questions, remove duplicates
-omop_care <-  rbind(copd_care_measurments, coag_care_measurments, vent_care_measurments, news2_care_measurments) %>%
+omop_care <- dbGetQuery(db, care_site_query_measurments) %>%
                 distinct() %>%
                 mutate(care_site_id=as.character(care_site_id),
                        covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"),
@@ -213,33 +136,25 @@ measurement_query <- paste0("SELECT DISTINCT * FROM
                                 visit_detail_end_datetime,
                                 visit_detail_start_datetime,
                                 (CASE
-                                  WHEN CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440))=0 THEN 1
-                                  ELSE CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440)) END) AS day,
-                               (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                              DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                              DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) AS length_of_stay, measurement_concept_id FROM
+                                  WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
+                                  ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                               (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
                         (SELECT visit_occurrence_id,
                                 visit_detail_start_datetime,
                                 visit_detail_end_datetime,
                                 visit_detail_id,
-                                care_site_id FROM omop_03082021.visit_detail
-                        WHERE (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                        DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                        DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) >=1) a
+                                care_site_id FROM visit_detail
+                        WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
                         LEFT JOIN
                         (SELECT visit_occurrence_id,
                                 measurement_datetime,
-                                measurement_concept_id FROM omop_03082021.measurement
+                                measurement_concept_id FROM measurement
                         	   WHERE measurement_concept_id IN (",
                             paste0(paste0("'", measurement %>% filter(!(category %in% c("blood_gas","blood_pressure", "RR Man", "RR Spont","news2Resp", "resp" ))) %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
                             GROUP BY visit_occurrence_id,
                                      measurement_datetime,
                                      measurement_concept_id) b
-                        USING (visit_occurrence_id)) c
+                        ON (visit_occurrence_id)) c
                         WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
                         GROUP BY visit_occurrence_id,
                                  visit_detail_id,
@@ -248,8 +163,8 @@ measurement_query <- paste0("SELECT DISTINCT * FROM
                                  measurement_concept_id,
                                  care_site_id) d
                         LEFT JOIN
-                        (SELECT concept_id as measurement_concept_id, concept_name as measurement_concept_name FROM omop_03082021.concept) e
-                        USING (measurement_concept_id)")
+                        (SELECT concept_id as measurement_concept_id, concept_name as measurement_concept_name FROM concept) e
+                        ON (d.measurement_concept_id = e.measurement_concept_id)")
 
 #We have to separate the blood query, as we want to consider all SBP, DBP, Mean BP as one measurement
 #type for the summary and it is easier to alise these measures in a separate query.
@@ -270,34 +185,26 @@ measurement_query_blood <- paste0("SELECT DISTINCT * FROM
                                     visit_detail_end_datetime,
                                     visit_detail_start_datetime,
                                    (CASE
-                                  WHEN CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440))=0 THEN 1
-                                  ELSE CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440)) END) AS day,
-                                   (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                                  DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                  DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) AS length_of_stay, measurement_concept FROM
+                                      WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
+                                      ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                                   (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
                             (SELECT visit_occurrence_id,
                                     visit_detail_start_datetime,
                                     visit_detail_end_datetime,
                                     visit_detail_id,
-                                    care_site_id FROM omop_03082021.visit_detail
-                            WHERE (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                            DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                            DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) >=1) a
+                                    care_site_id FROM visit_detail
+                            WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
                             LEFT JOIN
                             (SELECT visit_occurrence_id,
                             measurement_datetime,
                             'blood_pressure' AS measurement_concept
-                                    FROM omop_03082021.measurement
+                                    FROM measurement
                             	   WHERE measurement_concept_id IN (",
                                 paste0(paste0("'", measurement %>% filter(category == "blood_pressure") %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
                                 GROUP BY visit_occurrence_id,
                                 measurement_datetime,
                                 measurement_concept) b
-                            USING (visit_occurrence_id)) c
+                            ON (a.visit_occurrence_id = b.visit_occurrence_id)) c
                             WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
                             GROUP BY visit_occurrence_id,
                                      visit_detail_id,
@@ -324,29 +231,21 @@ bloodgas_query <- paste0("SELECT * FROM
                                               visit_detail_end_datetime,
                                               visit_detail_start_datetime,
                                              (CASE
-                                  WHEN CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440))=0 THEN 1
-                                  ELSE CEILING((DATE_PART('day', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp))  +
-                                      (DATE_PART('hour', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                      DATE_PART('minute', measurement_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440)) END) AS day,
-                                             (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                                            DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                            DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) AS length_of_stay, measurement_concept_id FROM
-                                            (SELECT visit_occurrence_id,
-                                                    visit_detail_start_datetime,
-                                                    visit_detail_end_datetime,
-                                                    visit_detail_id,
-                                                    care_site_id FROM omop_03082021.visit_detail
-                                            WHERE (DATE_PART('day', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) +
-                                            DATE_PART('hour', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) /24 +
-                                            DATE_PART('minute', visit_detail_end_datetime::timestamp - visit_detail_start_datetime::timestamp) / 1440) >=1) a
+                                            WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
+                                            ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                                         (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
+                                  (SELECT visit_occurrence_id,
+                                          visit_detail_start_datetime,
+                                          visit_detail_end_datetime,
+                                          visit_detail_id,
+                                          care_site_id FROM visit_detail
+                                  WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
                                       LEFT JOIN
                                       (SELECT * FROM
                                       (SELECT visit_occurrence_id,
                                               measurement_id,
                                               measurement_datetime,
-                                              measurement_concept_id FROM omop_03082021.measurement
+                                              measurement_concept_id FROM measurement
                                       WHERE measurement_concept_id IN (3010421, 3013290, 3027315) AND visit_occurrence_id IS NOT NULL
                                       GROUP BY visit_occurrence_id,
                                                 measurement_datetime,
@@ -355,15 +254,15 @@ bloodgas_query <- paste0("SELECT * FROM
                                       INNER JOIN
                                       (SELECT fact_id_1 as measurement_id,
                                               fact_id_2 as specimen_id
-                                               FROM omop_03082021.fact_relationship
+                                               FROM fact_relationship
                                        WHERE domain_concept_id_1 = 21 AND domain_concept_id_2 = 36) c
-                                      USING (measurement_id)
+                                      ON (b.measurement_id = c.measurement_id)
                                       INNER JOIN
                                       (SELECT specimen_id,
                                                 anatomic_site_concept_id
-                                       FROM omop_03082021.specimen WHERE anatomic_site_concept_id = 4136257) d
-                                      USING (specimen_id)) e
-                                      USING (visit_occurrence_id)) f
+                                       FROM specimen WHERE anatomic_site_concept_id = 4136257) d
+                                      ON (c.specimen_id = e.specimen_id)) e
+                                      ON (a.visit_occurrence_id = b.visit_occurrence_id)) f
                                       WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
                                       GROUP BY visit_occurrence_id,
                                                day,
@@ -372,28 +271,13 @@ bloodgas_query <- paste0("SELECT * FROM
                                                visit_detail_id,
                                                care_site_id) g
                                        LEFT JOIN
-                                      (SELECT concept_id as measurement_concept_id, concept_name as measurement_concept_name FROM omop_03082021.concept) h
-                                      USING (measurement_concept_id)")
+                                      (SELECT concept_id as measurement_concept_id, concept_name as measurement_concept_name FROM concept) h
+                                      ON (g.measurement_concept_id = h.measurement_concept_id)")
 
 #Warning: this takes 15-20 minutes to run until the join.
-copd_measure <- dbGetQuery(copd, measurement_query) %>%
-                rbind(dbGetQuery(copd, measurement_query_blood))  %>%
-                rbind(dbGetQuery(copd, bloodgas_query))
-
-coag_measure <- dbGetQuery(coag, measurement_query) %>%
-                  rbind(dbGetQuery(coag, measurement_query_blood))  %>%
-                  rbind(dbGetQuery(coag, bloodgas_query))
-
-vent_measure <- dbGetQuery(vent, measurement_query) %>%
-                rbind(dbGetQuery(vent, measurement_query_blood)) %>%
-                rbind(dbGetQuery(vent, bloodgas_query))
-
-news2_measure <- dbGetQuery(news2, measurement_query) %>%
-                rbind(dbGetQuery(news2, measurement_query_blood)) %>%
-                rbind(dbGetQuery(news2, bloodgas_query))
-
-#Append all four research questions together and remove duplicates
-omop_measure_all <- rbind(copd_measure, coag_measure, vent_measure, news2_measure) %>%
+omop_measure_all <- dbGetQuery(db, measurement_query) %>%
+                rbind(dbGetQuery(db, measurement_query_blood))  %>%
+                rbind(dbGetQuery(db, bloodgas_query)) %>%
                     distinct() %>%
                     mutate(covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"),
                            hospital_site=case_when(
@@ -401,8 +285,6 @@ omop_measure_all <- rbind(copd_measure, coag_measure, vent_measure, news2_measur
                              hospital_site==6 ~ "UCLH")) %>%
                     left_join(measurement %>% select(measurement_concept_id, category), by="measurement_concept_id")
 
-#Remove to make space for other queries
-rm(copd_measure, coag_measure, vent_measure, news2_measure)
 
 #Let's make the category a character, and code the blood pressure
 #category, as it is NA. In the final step, we make category a factor.
