@@ -9,18 +9,9 @@ library(lubridate) # for dates
 library(aweek) #to get week for the COVID cases time series
 library(purrr)
 
-#Enter information for the database
-host <- rstudioapi::askForPassword(prompt="Please enter server/host")
-database <- rstudioapi::askForPassword(prompt="Please enter database name")
-
-db <- DBI::dbConnect(
-  odbc::odbc(),
-  driver="ODBC Driver 17 for SQL Server",
-  Authentication="ActiveDirectoryInteractive",
-  server=host,
-  database=database
-)
-print("STATUS: connected to database")
+source("common-functions.R")
+source("common-database.R")
+source("common-queries.R")
 
 #Queries to create tables of ids by trust
 
@@ -897,49 +888,6 @@ CheckRR <- omop_meas_all_rr %>%
   dplyr::summarise(n=n(), los=max(floor(length_of_stay)), care_site=max(care_site_id_num)) %>%
   distinct()
 CheckRR$Diff <- CheckRR$n - CheckRR$los
-#This is the query used to extract COVID cases
-covid_pcr_query <- paste("SELECT a.visit_occurrence_id
-                        FROM
-                        (SELECT visit_occurrence_id,
-                                measurement_id AS fact_id_1
-                                FROM measurement
-                                WHERE (measurement_concept_id=37310255)
-                                AND (value_as_concept_id=37310282)) a
-                        INNER JOIN
-                        (SELECT fact_id_1,
-                              fact_id_2 as specimen_id
-                              FROM fact_relationship
-                        WHERE domain_concept_id_1=21 AND domain_concept_id_2=36) b
-                        ON (a.fact_id_1 = b.fact_id_1)
-                        INNER JOIN
-                        (SELECT specimen_id,
-                                specimen_date
-                                FROM specimen) c
-                        ON (b.specimen_id = c.specimen_id)
-                        INNER JOIN
-                        (SELECT visit_occurrence_id,
-                                visit_start_date,
-                                visit_end_date
-                                FROM visit_occurrence) d
-                        ON (a.visit_occurrence_id = d.visit_occurrence_id)
-                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
-                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
-
-#Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
-                              FROM
-                              (SELECT * FROM condition_occurrence
-                              WHERE condition_concept_id IN (45590872, 703441,
-                              37310287, 45604597, 37311060, 703440, 37310282,
-                              439676, 45585955, 37311061, 45756093, 45756094,
-                              320651, 37310268)) a
-                              INNER JOIN (SELECT visit_start_date,
-                                                 visit_end_date,
-                                                 visit_occurrence_id
-                                                 FROM visit_occurrence) b
-                              ON (a.visit_occurrence_id = b.visit_occurrence_id)
-                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
-                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
 omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%

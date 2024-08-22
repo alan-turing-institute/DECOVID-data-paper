@@ -9,18 +9,9 @@ library(dplyr) #for data manipulation
 library(Hmisc) #for describing variables
 library(purrr) #for data manipulation
 
-#Enter information for the database
-host <- rstudioapi::askForPassword(prompt="Please enter server/host")
-database <- rstudioapi::askForPassword(prompt="Please enter database name")
-
-db <- DBI::dbConnect(
-  odbc::odbc(),
-  driver="ODBC Driver 17 for SQL Server",
-  Authentication="ActiveDirectoryInteractive",
-  server=host,
-  database=database
-)
-print("STATUS: connected to database")
+source("common-functions.R")
+source("common-database.R")
+source("common-queries.R")
 
 #Concept IDs for measurements interest for figure 1b
 MeasurementstoPull = c(37208354, 3020716, 3020460, 3007194, 4239408, 4313591, 3013502,4141684,3027315,40762499  )
