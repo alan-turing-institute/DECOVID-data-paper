@@ -24,13 +24,13 @@ source("common-database.R")
 source("common-queries.R")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQueryBothTrusts(db, covid_pcr_query) %>%
   distinct()
 
 #Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
 #is used to remove duplicates
 omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query)) %>%
   distinct()
 
 #Before proceeding, specify the COVID-19 case type the data summaries should be based on.
@@ -44,26 +44,26 @@ covid_case_type <- omop_covid_all
 
 #Again, we have to query each of DECOVID's research question databases separately. Here,
 #we do not need to remove duplicates at this stage.
-omop_visit_all <- dbGetQuery(db, visit_query) %>%
+omop_visit_all <- dbGetQueryBothTrusts(db, visit_query) %>%
                mutate(covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"))
 
 #visit_detail query - this is to identity the level of care for each visit, as the
 visit_detail_query <- paste0("SELECT care_site_id, visit_occurrence_id FROM
                              visit_detail")
 
-omop_care <- dbGetQuery(db, visit_detail_query) %>%
+omop_care <- dbGetQueryBothTrusts(db, visit_detail_query) %>%
                     distinct() %>%
                     #the care_site_id values are integer64, which sometimes has issues, so convert to numeric, but
                     #first convert the integer64 to character.
                     mutate(care_site_id=as.numeric(as.character(care_site_id)))
 
 #The condition_occurrence table is now queried, as this is used for the visit-level summaries.
-omop_cond_all <- dbGetQuery(db, condition_q) %>%
+omop_cond_all <- dbGetQueryBothTrusts(db, condition_q) %>%
                  distinct()
 
 #Let's create a copy of the omop_visit_all as a primary table
 #of all visit_occurrence_ids for the condition summary
-omop_for_visit_condition <- data.frame(visit_occurrence_id=as.numeric(as.character(omop_visit_all[,c("visit_occurrence_id")])))
+omop_for_visit_condition <- data.frame(visit_occurrence_id=omop_visit_all[,c("visit_occurrence_id")])
 
 #Let's take the columns of interest from the condition table
 omop_cond_all_final <- omop_cond_all[,c("condition_occurrence_id","visit_occurrence_id","concept_name")]
@@ -121,7 +121,7 @@ drug_q <- paste0("SELECT a.*,
                       ON a.drug_type_concept_id=c.drug_type_concept_id_ctable")
 
 
-omop_drug_all <- dbGetQuery(db, drug_q) %>%
+omop_drug_all <- dbGetQueryBothTrusts(db, drug_q) %>%
                   distinct()
 
 ###Now let's load the concept relationship table.
@@ -133,19 +133,23 @@ omop_drug_all <- dbGetQuery(db, drug_q) %>%
 concept_relationship_q <- paste0("SELECT *
                                  FROM concept_relationship")
 
-concept_relationship_table <- dbGetQuery(db, concept_relationship_q)
+concept_relationship_table <- dbGetQueryBothTrusts(db,
+                                                   concept_relationship_q,
+                                                   schemas = "dbo")
 
 #Load ancestor table
 concept_ancestor_q <- paste0("SELECT *
                                 FROM concept_ancestor")
 
-concept_ancestor_table <- dbGetQuery(db, concept_ancestor_q)
+concept_ancestor_table <- dbGetQueryBothTrusts(db,
+                                               concept_ancestor_q,
+                                               schemas = "dbo")
 
 #Load concept table
 concept_q <- paste0("SELECT *
                      FROM concept")
 
-concept <- dbGetQuery(db, concept_q)
+concept <- dbGetQueryBothTrusts(db, concept_q, schemas = "dbo")
 
 #Translate non-standard to standard
 concept_relationship_table_standard <- concept_relationship_table %>%
@@ -259,7 +263,7 @@ BMI_query <- paste("SELECT b.visit_occurrence_id,
                       WHERE ((measurement_datetime>=visit_start_datetime) AND (measurement_datetime<=visit_end_datetime))")
 
 
-omop_BMI_table <- dbGetQuery(db, BMI_query) %>%
+omop_BMI_table <- dbGetQueryBothTrusts(db, BMI_query) %>%
             distinct()
 
 #Select only necessary columns and reshape the data to wide format
@@ -325,8 +329,8 @@ omop_visit_clean_all <- omop_visit_all %>%
                         #In the queries, the hospital site variable was created, where the last digit of visit_occurrence,
                         #or person_id can be used to identify the site/Trust as below.
                         mutate(hospital_site=case_when(
-                          hospital_site==4 ~ "UHB",
-                          hospital_site==6 ~ "UCLH")) %>%
+                          schema=="uhb" ~ "UHB",
+                          schema=="uclh" ~ "UCLH")) %>%
 
                         #There are instances where the length of stay, or patient days, of a
                         mutate(patient_days=ifelse(patient_days < 0, NA, patient_days)) %>%
@@ -441,13 +445,12 @@ text_all <- paste0(n_distinct(omop_covid_pcr), " (", round(n_distinct(omop_covid
 
 #Could technically use the visit data above, but instead let's query
 #the person table.
-person_level_table <- paste0("SELECT a.person_id %10 as hospital_site,
-                                     a.person_id,
+person_level_table <- paste0("SELECT a.person_id,
                                      b.visit_count,
                                     c.gender_concept_name,
                                     d.race_concept_name,
                                     e.LSOA_code,
-                                    f.COVID
+                                    f.covid
                              FROM
                              (SELECT person_id,
                                      race_concept_id,
@@ -477,14 +480,14 @@ person_level_table <- paste0("SELECT a.person_id %10 as hospital_site,
                              ON a.location_id=e.location_id
                              LEFT JOIN
                              (SELECT  DISTINCT person_id,
-                                      COUNT(DISTINCT person_id) as COVID
+                                      COUNT(DISTINCT person_id) as covid
                              FROM visit_occurrence
                              WHERE visit_occurrence_id IN (",paste0(paste0("'", covid_case_type %>%pull(visit_occurrence_id), "'", collapse=",")), ")
                              GROUP BY person_id) f
                              ON a.person_id=f.person_id")
 
 
-omop_person_table <- dbGetQuery(db, person_level_table) %>%
+omop_person_table <- dbGetQueryBothTrusts(db, person_level_table) %>%
                       distinct() %>%
                       mutate(gender_concept_name=tolower(gender_concept_name) %>% Hmisc::capitalize(),
                               gender_concept_name=ifelse(gender_concept_name=="Unknown" | gender_concept_name=="No matching concept", "Unknown", gender_concept_name),
@@ -497,7 +500,7 @@ omop_person_table <- dbGetQuery(db, person_level_table) %>%
                                 race_concept_name=="Ethnicity not stated" | race_concept_name=="Unknown racial group" ~ "Unknown"),
                                 race_concept_name=NULL,
                              covid=ifelse(is.na(covid), "No", "Yes"),
-                             hospital_site = ifelse(hospital_site==4, "UHB", "UCLH"),
+                             hospital_site = ifelse(schema=="uhb", "UHB", "UCLH"),
                              visit_count=as.numeric(visit_count))
 
 

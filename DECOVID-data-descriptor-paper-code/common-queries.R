@@ -1,5 +1,5 @@
 #This is the query used to extract COVID cases
-covid_pcr_query <- paste("SELECT a.visit_occurrence_id
+covid_pcr_query <- paste("SELECT DISTINCT a.visit_occurrence_id
                         FROM
                         (SELECT visit_occurrence_id,
                                 measurement_id AS fact_id_1
@@ -20,14 +20,17 @@ covid_pcr_query <- paste("SELECT a.visit_occurrence_id
                         INNER JOIN
                         (SELECT visit_occurrence_id,
                                 visit_start_date,
-                                visit_end_date
+                                visit_end_date,
+                                visit_start_datetime,
+                                visit_end_datetime
                                 FROM visit_occurrence) d
                         ON (a.visit_occurrence_id = d.visit_occurrence_id)
-                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
-                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
+                        WHERE
+                        (( DATEDIFF(day, specimen_date, CAST(visit_start_datetime as DATE)) <= 14 AND (specimen_date <= CAST(visit_end_datetime as DATE)))
+                        OR ( DATEDIFF(day, specimen_date, CAST(visit_start_datetime as DATE)) <= 14 AND (visit_end_datetime IS NULL)))")
 
 #Confirmed/suspected COVID-19 Query
-covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
+covid_obs_all_query <- paste("SELECT DISTINCT a.visit_occurrence_id
                               FROM
                               (SELECT * FROM condition_occurrence
                               WHERE condition_concept_id IN (45590872, 703441,
@@ -36,11 +39,13 @@ covid_obs_all_query <- paste("SELECT a.visit_occurrence_id
                               320651, 37310268)) a
                               INNER JOIN (SELECT visit_start_date,
                                                  visit_end_date,
+                                                 visit_start_datetime,
+                                                 visit_end_datetime,
                                                  visit_occurrence_id
                                                  FROM visit_occurrence) b
                               ON (a.visit_occurrence_id = b.visit_occurrence_id)
-                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
-                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
+                              WHERE ((DATEDIFF(day, condition_start_date, CAST(visit_start_datetime as DATE)) <= 14 AND (condition_start_date <= CAST(visit_end_datetime as DATE)))
+                              OR (DATEDIFF(day, condition_start_date, CAST(visit_start_datetime as DATE)) <= 14 AND (visit_end_datetime IS NULL)))")
 
 
 visit_query <- paste0("SELECT visit_occurrence_id,
@@ -48,7 +53,6 @@ visit_query <- paste0("SELECT visit_occurrence_id,
                               gender_concept_name,
                               race_concept_name,
                               year_of_birth,
-                              hospital_site,
                               visit_start_date,
                               visit_end_date,
                               admitting_source_concept_name,
@@ -63,8 +67,7 @@ visit_query <- paste0("SELECT visit_occurrence_id,
                                       admitting_source_concept_id,
                                       discharge_to_concept_id,
                              (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 1440) AS patient_days,
-                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 60) AS patient_hours,
-                              visit_occurrence_id %10 AS hospital_site
+                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 60) AS patient_hours
                               FROM visit_occurrence) a
                               LEFT JOIN
                               (SELECT gender_concept_id,
@@ -95,7 +98,6 @@ visit_query <- paste0("SELECT visit_occurrence_id,
                               ON (a.admitting_source_concept_id = f.admitting_source_concept_id)")
 
 condition_q <- paste0("SELECT a.*,
-                              a.visit_occurrence_id %10 AS hospital_site,
                               b.concept_id,
                               b.concept_name,
                               c.concept_id AS concept_id_specific,
