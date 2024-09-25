@@ -7,12 +7,13 @@
 #Last Updated: 12 June 2022
 
 #uncomment the following lines if the packages have not been installed previously.
-#install,packages(c("DBI", "dplyr", "Hmisc", "purrr", "reshape2"))
+#install,packages(c("DBI", "dplyr", "Hmisc", "purrr", "reshape2", "tidyr"))
 library(DBI) #for performing SQL queries
 library(dplyr) #for data manipulation
 library(Hmisc) #for describing variables
 library(purrr) #for data manipulation
 library(reshape2) #for use of dcast
+library(tidyr)
 
 source("common-functions.R")
 source("common-database.R")
@@ -189,7 +190,8 @@ bloodgas_query <- paste0("SELECT g.*, measurement_concept_name FROM
                                               measurement_id,
                                               measurement_datetime,
                                               measurement_concept_id FROM measurement
-                                      WHERE measurement_concept_id IN (3010421, 3013290, 3027315) AND visit_occurrence_id IS NOT NULL
+                                      WHERE measurement_concept_id IN (",
+                         paste0(paste0("'", measurement %>% filter(category == "blood_gas") %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
                                       GROUP BY visit_occurrence_id,
                                                 measurement_datetime,
                                                 measurement_concept_id,
@@ -442,3 +444,63 @@ rbind(omop_count_all_l1_any_visit_type %>%
         write.csv("omop_measure_l1_mean_missing_any_visit_type_Paper.csv", row.names=FALSE, na="")
 
 
+# Table to link concept names with ID (to allow filtering by ID)
+omop_concept_ids <- omop_measure_all %>%
+  select(measurement_concept_name, measurement_concept_id) %>%
+  group_by(measurement_concept_name, measurement_concept_id) %>%
+  summarise()
+
+# Extract and format information needed for Table 1 in the paper
+################################################################
+
+# Extract concepts included in Table 1 in the paper
+concepts_to_include_in_order <-
+  c(# Clinical observations
+    "4239408", "4302666", "4313591", "40762499", "5152194", "415470", "3007194",
+    "37208354",
+
+    # FBCs
+    "3010813", "3013429", "3017732", "3019198", "3000963", "3007461",
+
+    # U&Es
+    "3020564", "3000285", "3005456",
+
+    "3020460",
+
+    # ABGs
+    "3010421", "3013290", "3027315")
+
+pivot_and_format_for_table <- function(x,
+                                       omop_concept_ids,
+                                       concepts_to_include_in_order){
+  x %>%
+    mutate(med_missing = paste0(round(med, 1), " [", round(missing, 1), "]")) %>%
+    pivot_wider(id_cols = c(measurement_concept_name),
+                names_from = c(hospital_site, covid),
+                values_from = med_missing,
+                names_sort = TRUE) %>%
+    left_join(omop_concept_ids) %>%
+    filter(as.character(measurement_concept_id) %in% concepts_to_include_in_order |
+             measurement_concept_name == "blood_pressure") %>%
+    arrange(factor(measurement_concept_id, levels = concepts_to_include_in_order)) %>%
+    relocate(UCLH_No, .after = UCLH_Yes) %>%
+    relocate(UHB_No, .after = UHB_Yes)
+}
+
+# Extract "median measurements/day (% missing)"
+# and arrange in the format needed for the paper
+l1_table <- MediansL1_dataframe %>%
+  rename(measurement_concept_name = measurement) %>%
+  left_join(omop_count_all_l1_any_visit_type) %>%
+  pivot_and_format_for_table(omop_concept_ids, concepts_to_include_in_order)
+
+write.csv(l1_table, file = "l1_table.csv")
+
+# Extract "median measurements/day (% missing)"
+# and arrange in the format needed for the paper
+l2_table <- Medians_L2_L3 %>%
+  rename(measurement_concept_name = measurement) %>%
+  left_join(omop_count_all_l2_l3_any) %>%
+  pivot_and_format_for_table(omop_concept_ids, concepts_to_include_in_order)
+
+write.csv(l2_table, file = "l2_table.csv")
