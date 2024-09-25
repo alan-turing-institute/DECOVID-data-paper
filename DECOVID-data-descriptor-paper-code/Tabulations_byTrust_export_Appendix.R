@@ -58,10 +58,10 @@ drug_concept_id_query <- paste0("SELECT a.drug_exposure_id,
                         ON a.route_concept_id=d.d_route_concept_id")
 
 
-drugs_tabulation <- dbGetQuery(db, drug_concept_id_query) %>%
+drugs_tabulation <- dbGetQueryBothTrusts(db, drug_concept_id_query) %>%
                     distinct() %>%
-                    mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                                    hospital_site==6 ~ "UCLH"))
+                    mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                                    schema == "uclh" ~ "UCLH"))
 
 drugs_concept_table <- drugs_tabulation %>%
                         group_by(drug_concept_id,drug_concept_name, hospital_site) %>%
@@ -100,7 +100,7 @@ drugs_concept_vocab_table = drugs_concept_vocab_table %>%
                             mutate(UHB = if_else(is.na(UHB)|UHB<=10,"<=10", as.character(UHB)),
                                    UCLH = if_else(is.na(UCLH)|UCLH<=10,"<=10", as.character(UCLH)))
 
-write.csv(drugs_concept_class_table, "drugs_concept_vocab_table_Trust.csv", na="", row.names=FALSE)
+write.csv(drugs_concept_vocab_table, "drugs_concept_vocab_table_Trust.csv", na="", row.names=FALSE)
 
 drugs_route_concept_table <- drugs_tabulation %>%
                               group_by(route_concept_id,route_concept_name, hospital_site) %>%
@@ -161,10 +161,10 @@ condition_concepts_query <- paste0("SELECT a.condition_occurrence_id,
                         ON a.condition_status_concept_id=d.d_condition_status_concept_id")
 
 
-conds_tabulation <- dbGetQuery(db, condition_concepts_query) %>%
+conds_tabulation <- dbGetQueryBothTrusts(db, condition_concepts_query) %>%
                     distinct() %>%
-                    mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                                     hospital_site==6 ~ "UCLH"))
+                    mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                                     schema == "uclh" ~ "UCLH"))
 
 conds_concept_table <- conds_tabulation %>%
                         group_by(condition_concept_id,condition_concept_name, hospital_site) %>%
@@ -271,10 +271,10 @@ procedure_concepts_query <- paste0("SELECT a.procedure_occurrence_id,
                         ON a.procedure_source_concept_id=d.d_procedure_source_concept_id")
 
 
-proc_tabulation <- dbGetQuery(db, procedure_concepts_query) %>%
+proc_tabulation <- dbGetQueryBothTrusts(db, procedure_concepts_query) %>%
   distinct()  %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"))
 
 proc_concept_table <- proc_tabulation %>%
                       group_by(procedure_concept_id,procedure_concept_name, hospital_site) %>%
@@ -338,10 +338,10 @@ spec_concepts_query <- paste0("SELECT a.specimen_id,
                         ON a.anatomic_site_concept_id=c.c_anatomic_site_id")
 
 
-spec_tabulation <- dbGetQuery(db, spec_concepts_query) %>%
+spec_tabulation <- dbGetQueryBothTrusts(db, spec_concepts_query) %>%
                   distinct() %>%
-                  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                                   hospital_site==6 ~ "UCLH"))
+                  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                                   schema == "uclh" ~ "UCLH"))
 
 specimen_concept_table <- spec_tabulation %>%
                             group_by(specimen_concept_id,specimen_concept_name, hospital_site) %>%
@@ -423,7 +423,6 @@ visit_occur_concepts_query <- paste0("SELECT a.visit_occurrence_id,
                                         d.discharge_to_concept_name,
                                         d.concept_class_id_discharge_to,
                                         d.vocabulary_id_visit_discharge_to,
-                                        a.visit_occurrence_id,
                                         a.person_id,
                                         (CASE WHEN a.visit_occurrence_id IS NOT NULL THEN a.visit_occurrence_id %10
                                           WHEN a.person_id IS NOT NULL THEN a.person_id %10
@@ -452,10 +451,10 @@ visit_occur_concepts_query <- paste0("SELECT a.visit_occurrence_id,
                         ON a.discharge_to_concept_id=d.d_discharge_to_concept_id")
 
 
-visitocc_tabulation <- dbGetQuery(db, visit_occur_concepts_query) %>%
+visitocc_tabulation <- dbGetQueryBothTrusts(db, visit_occur_concepts_query) %>%
   distinct() %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"))
 
 
 visit_concept_table <- visitocc_tabulation %>%
@@ -502,7 +501,6 @@ write.csv(discharge_concept_table, "discharge_concept_table_byTrust.csv", na="",
 #Visit_detail
 visit_detail_concepts_query <- paste0("SELECT a.visit_detail_id,
                                         a.visit_detail_concept_id,
-                                        a.care_site_id,
                                         b.visit_detail_concept_name,
                                         b.concept_class_id_visit_detail,
                                         b.vocabulary_id__visit_detail,
@@ -526,10 +524,10 @@ visit_detail_concepts_query <- paste0("SELECT a.visit_detail_id,
                         ON a.care_site_id=c.care_site_id_c")
 
 
-visitdet_tabulation <- dbGetQuery(db, visit_detail_concepts_query) %>%
+visitdet_tabulation <- dbGetQueryBothTrusts(db, visit_detail_concepts_query) %>%
   distinct() %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"))
 
 visit_det_concept_table <- visitdet_tabulation %>%
                           group_by(visit_detail_concept_id,visit_detail_concept_name, hospital_site) %>%
@@ -569,9 +567,7 @@ person_query_concepts <- paste0("SELECT a.person_id,
                                   a.race_concept_id,
                                   c.race_concept_name,
                                   c.concept_class_id_race,
-                                  c.vocabulary_id_race,
-                                  a.person_id,
-                                  a.person_id %10 as hospital_site
+                                  c.vocabulary_id_race
                         FROM person a
                         LEFT JOIN
                         (SELECT concept_id as b_gender_concept_id,
@@ -588,10 +584,10 @@ person_query_concepts <- paste0("SELECT a.person_id,
                           FROM concept) c
                           ON a.race_concept_id=c.c_race_concept_id")
 
-person_tabulation <- dbGetQuery(db, person_query_concepts) %>%
+person_tabulation <- dbGetQueryBothTrusts(db, person_query_concepts) %>%
   distinct() %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"))
 
 gender_concept_table <- person_tabulation %>%
   group_by(gender_concept_id,gender_concept_name, hospital_site) %>%
@@ -618,6 +614,7 @@ race_concept_table = race_concept_table %>%
 
 write.csv(race_concept_table, "race_concept_table_byTrust.csv", na="", row.names=FALSE)
 
+
 #Death
 death_query_concepts <- paste0("SELECT a.person_id,
                                        a.death_type_concept_id,
@@ -643,7 +640,7 @@ death_query_concepts <- paste0("SELECT a.person_id,
                           FROM concept) d
                                ON a.cause_source_concept_id=d.d_cause_source_concept_id")
 
-death_tabulation <- dbGetQuery(db, death_query_concepts) %>%
+death_tabulation <- dbGetQueryBothTrusts(db, death_query_concepts) %>%
   distinct()
 
 colnames(death_tabulation)
@@ -685,9 +682,9 @@ meas_q <- paste0("SELECT a.measurement_id,
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-omop_meas_all <- dbGetQuery(db, meas_q) %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
+omop_meas_all <- dbGetQueryBothTrusts(db, meas_q) %>%
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"))
 
 
 measurements_concept_table <- omop_meas_all %>%
@@ -727,266 +724,3 @@ measurements_concept_class_table = measurements_concept_class_table %>%
          UCLH = if_else(is.na(UCLH)|UCLH<=10,"<=10", as.character(UCLH)))
 
 write.csv(measurements_concept_class_table,"measurements_concept_class_table_byTrust.csv", na="", row.names=F)
-
-
-meas_q <- paste0("SELECT a.*,
-                         b.measurement_concept_name,
-                         b.concept_class_id_measurement,
-                         b.vocabulary_id_measurement,
-                          (CASE WHEN a.visit_occurrence_id IS NOT NULL THEN a.visit_occurrence_id %10
-                                WHEN a.person_id IS NOT NULL THEN a.person_id %10
-                                ELSE NULL END) as hospital_site
-                      FROM
-                      (SELECT *
-                      FROM measurement
-                      WHERE measurement_concept_id IN ('4313591', '4108138','4154772')) a
-                      LEFT JOIN
-                      (SELECT concept_id as measurement_id,
-                              concept_name as measurement_concept_name,
-                              concept_class_id as concept_class_id_measurement,
-                                vocabulary_id as vocabulary_id_measurement
-                       FROM concept) b
-                      ON a.measurement_concept_id=b.measurement_id")
-
-
-omop_meas_all <- dbGetQuery(db, meas_q) %>%
-                 distinct()
-
-omop_meas_all <- omop_meas_all %>%
-                 mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"))
-
-omop_care$visit_detail_id_char <- as.character(omop_care$visit_detail_id)
-omop_meas_all$visit_detail_id_char <- as.character(omop_meas_all$visit_detail_id)
-
-sum(is.na(omop_meas_all$visit_detail_id_char))
-sum(is.na(as.character(omop_meas_all$visit_occurrence_id)))
-
-omop_meas_all_care <- inner_join(omop_meas_all, omop_care, by=c("visit_occurrence_id"))
-
-omop_meas_all_carefilter <- omop_meas_all_care %>%
-  filter(patient_days>=1) %>%
-  filter(measurement_datetime>=visit_detail_start_datetime, measurement_datetime<=visit_detail_end_datetime)
-
-omop_meas_all_carefilter$day <- ceiling(as.numeric((omop_meas_all_carefilter$measurement_datetime-omop_meas_all_carefilter$visit_detail_start_datetime))/ 86400)
-
-NewMeasures <- omop_meas_all_carefilter %>%
-  group_by(visit_occurrence_id, visit_detail_id.y, care_site_id, hospital_site.x,day, patient_days) %>%
-  summarise(count=n())
-
-NewMeasures$hospital_site <- ifelse(as.character(NewMeasures$visit_detail_id %% 10)=="4", "UHB", "UCLH")
-table(omop_meas_all$hospital_site, omop_meas_all$measurement_concept_name)
-omop_meas_all$person_id_num <- as.numeric(omop_meas_all$person_id)
-
-omop_meas_all_UHB <- omop_meas_all %>%
-                    filter(hospital_site=="UHB") %>%
-                    arrange(person_id_num, measurement_datetime)
-
-measurement <- read.csv("measurements_filtered.csv") %>%
-  rename(measurement_concept_id=concept_id)
-
-#type for the summary and it is easier to alise these measures in a separate query.
-RRQuery<- paste0("SELECT * FROM
-                            (SELECT visit_occurrence_id,
-                                    visit_occurrence_id %10 as hospital_site,
-                                    day,
-                                    length_of_stay,
-                                    visit_detail_id,
-                                    care_site_id,
-                                    measurement_concept AS measurement_concept_id,
-                                    'RespiratoryRate' AS measurement_concept_name,
-                                    COUNT(measurement_concept) FROM
-                            (SELECT visit_occurrence_id,
-                                    visit_detail_id,
-                                    care_site_id,
-                                    measurement_datetime,
-                                    visit_detail_end_datetime,
-                                    visit_detail_start_datetime,
-                                    (CASE
-                                       WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
-                                       ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
-                                    (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
-                             (SELECT visit_occurrence_id,
-                                     visit_detail_start_datetime,
-                                     visit_detail_end_datetime,
-                                     visit_detail_id,
-                                     care_site_id FROM visit_detail
-                             WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
-                            LEFT JOIN
-                            (SELECT visit_occurrence_id,
-                                    measurement_datetime,
-                                   'RespiratoryRate' AS measurement_concept
-                                    FROM measurement
-                            	   WHERE measurement_concept_id IN (",
-                                  paste0(paste0("'", measurement %>% filter(category %in% c("resp")) %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
-                                GROUP BY visit_occurrence_id,
-                                measurement_datetime,
-                                measurement_concept) b
-                            on (a.visit_occurrence_id = b.visit_occurrence_id)) c
-                            WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
-                            GROUP BY visit_occurrence_id,
-                                     visit_detail_id,
-                                     day,
-                                     length_of_stay,
-                                     measurement_concept,
-                                     care_site_id) d")
-
-
-#This query pulls all measurement records for the measurements read in the csv file above
-RRQuery <- paste("SELECT *
-                  FROM
-                        (SELECT visit_occurrence_id,
-                                visit_occurrence_id %10 as hospital_site,
-                                day,
-                                length_of_stay,
-                                visit_detail_id,
-                                care_site_id,
-                                measurement_concept_id,
-                                COUNT(measurement_concept_id) FROM
-                        (SELECT visit_occurrence_id,
-                                visit_detail_id,
-                                care_site_id,
-                                measurement_datetime,
-                                visit_detail_end_datetime,
-                                visit_detail_start_datetime,
-                                (CASE
-                                   WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
-                                   ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
-                                (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
-                         (SELECT visit_occurrence_id,
-                                 visit_detail_start_datetime,
-                                 visit_detail_end_datetime,
-                                 visit_detail_id,
-                                 care_site_id FROM visit_detail
-                         WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
-                        LEFT JOIN
-                        (SELECT visit_occurrence_id,
-                                measurement_datetime,
-                                measurement_concept_id
-                                FROM measurement
-                        	   WHERE measurement_concept_id IN ('4313591','4108138','4154772')) AND visit_occurrence_id IS NOT NULL) b
-                        on (a.visit_occurrence_id = b.visit_occurrence_id)) c
-                        WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
-                        GROUP BY visit_occurrence_id,
-                                 visit_detail_id,
-                                 day,
-                                 length_of_stay,
-                                 measurement_concept_id,
-                                 care_site_id) d
-                        LEFT JOIN
-                        (SELECT concept_id as measurement_concept_id, concept_name as measurement_concept_name FROM concept) e
-                        on (d.measurement_concept_id = e.measurement_concept_id)")
-
-omop_meas_all_rr <- dbGetQuery(db, RRQuery) %>%
-                    distinct()
-
-omop_meas_all_rr$visit_detail_id_char <- as.character(omop_meas_all_rr$visit_detail_id)
-omop_meas_all_rr$care_site_id_num <- as.numeric(omop_meas_all_rr$care_site_id)
-
-CheckRR <- omop_meas_all_rr %>%
-  group_by(visit_detail_id_char) %>%
-  dplyr::summarise(n=n(), los=max(floor(length_of_stay)), care_site=max(care_site_id_num)) %>%
-  distinct()
-CheckRR$Diff <- CheckRR$n - CheckRR$los
-
-#Run PCR Only Queries - distinct() is used to remove duplicates
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
-  distinct()
-
-
-#Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
-#is used to remove duplicates
-omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
-  distinct()
-
-#Before proceeding, specify the COVID-19 case type the data summaries should be based on.
-#In the DECOVID Data Descriptor paper, the omop_covid_all cases are used.
-#However, the omop_covid_pcr can be assigned to covid_case_type instead.
-covid_case_type <- omop_covid_all
-
-################################################
-####### Table 1 - Measurements/Obs data ########
-################################################
-
-#Revised Becki's original queries to query visit detail instead. What this query
-#does is retrieves all records in the visit_detail table that have a measurement
-#take place between the visit_detail interval (inclusive)
-
-#Very important to note that a measurement datetime can be equal to visit_detail start_datetime
-#(same for visit_occurrence start_datetime), and ceiling 0 would result in 0, although we want this to be 1
-#whether we are looking at hours or days. A case when statement has been included in the code
-#to account for this.
-
-#Care site query with the # of days in each visit detail record from visit_detail table
-#This is the only we can calculate the number patient days in each level of care
-care_site_query_measurments <- paste0("SELECT * ,
-                                      visit_occurrence_id %10 as hospital_site,
-                                      DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 AS patient_days
-                                       FROM visit_detail")
-
-omop_care <- dbGetQuery(db, care_site_query_measurments) %>%
-  distinct() %>%
-  mutate(care_site_id=as.character(care_site_id),
-         covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"),
-         hospital_site=case_when(
-           hospital_site==4 ~ "UHB",
-           hospital_site==6 ~ "UCLH"))
-
-#Let's make the category a character, and code the blood pressure
-#category, as it is NA. In the final step, we make category a factor.
-
-
-#Converting other relevant bigint fields to character.
-omop_meas_all_rr$care_site_id_char = as.character(omop_meas_all_rr$care_site_id)
-
-#Level 2/3 Care
-omop_meas_all_rr_l2l3 <- omop_meas_all_rr %>%
-  filter(care_site_id_char %in% c("1","2","3","15","20","21","22"))
-NewMeasures$care_site_id
-CheckRRl2l3 <- NewMeasures %>%
-  filter(care_site_id %in% c("1","2","3","15","20","21","22")) %>%
-  filter(day <= floor(patient_days))
-CheckRRl2l3$visit_occurrence_id <- as.character(CheckRRl2l3$visit_occurrence_id)
-
-CheckRRl2l3$covid <- if_else(CheckRRl2l3$visit_occurrence_id %in% as.character(omop_covid_all$visit_occurrence_id), "Yes", "No")
-
-CheckRRl2l3 %>%
-  filter(day <= floor(patient_days)) %>%
-  group_by(hospital_site.x, covid) %>%
-  summarise(days=n(), count=sum(count))
-#make level 2 and 3 copy of omop_care to get total 24-hour periods.
-omop_care_l2_l3_any_visit_type <- omop_care %>%
-  filter(care_site_id %in% c("1","2","3","15","20","21","22"))  %>%
-  filter(patient_days>=1)
-
-#Calculate number of completed 24 hour windows in visit detail for only level 2 and 3 care types.
-#for mean and % missing.
-n_complete_windows_all_l2_l3_any_visit <- omop_care_l2_l3_any_visit_type %>%
-                                            group_by(hospital_site, covid) %>%
-                                            summarise(total_days=sum(floor(patient_days)))
-
-omop_meas_all_rr_l2l3$hospital_site <- ifelse(as.character(omop_meas_all_rr_l2l3$hospital_site)=="4", "UHB", "UCLH")
-table()
-#Calculate mean and % missing for all measurements
-
-
-omop_count_all_l2_l3_any <- omop_meas_all_rr_l2l3 %>%
-  filter(day <= floor(length_of_stay)) %>%
-  mutate(count=as.numeric(count)) %>%
-  group_by( measurement_concept_name, hospital_site) %>% summarise(days_for_calc=n(),sum=sum(count)) %>%
-  left_join(n_complete_windows_all_l2_l3_any_visit, by=c("hospital_site")) %>%
-  mutate(mean = signif(sum/total_days, 2), missing=round(((total_days-days_for_calc)/total_days)*100, 1))
-
-RR_check <- omop_meas_all_rr_l2l3 %>%
-            filter(measurement_concept_name %in% c("Rate of spontaneous respiration", "Respiratory rate", "Ventilator rate" ))
-#Write mean and missingness file
-rbind(omop_count_all_l2_l3_any %>%
-        dcast(measurement_concept_name ~ hospital_site, value.var=c("mean")) %>%
-        mutate("Summary"=rep("mean")), omop_count_all_l2_l3_any %>% dcast(measurement_concept_name ~ hospital_site, value.var=c("missing")) %>%
-        mutate("Summary"=rep("% missing"))) %>% arrange(measurement_concept_name) %>%
-  write.csv("omop_measure_mean_missing_l2_l3_anyvisittype_RR.csv", row.names=FALSE, na="")
-
-
-
-
