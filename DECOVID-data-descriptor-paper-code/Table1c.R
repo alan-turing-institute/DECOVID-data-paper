@@ -24,13 +24,13 @@ source("common-database.R")
 source("common-queries.R")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQueryBothTrusts(db, covid_pcr_query) %>%
   distinct()
 
 #Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
 #is used to remove duplicates
 omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query)) %>%
   distinct()
 
 #Before proceeding, specify the COVID-19 case type the data summaries should be based on.
@@ -83,10 +83,10 @@ vent_value_num <-  paste("SELECT visit_occurrence_id,
                          WHERE visit_occurrence_id IS NOT NULL")
 
 
-omop_vent_char <- dbGetQuery(db, vent_value_char) %>%
+omop_vent_char <- dbGetQueryBothTrusts(db, vent_value_char) %>%
   mutate(value_as_concept_id = as.numeric(value_as_concept_id))
 
-omop_vent_num <- dbGetQuery(db, vent_value_num)
+omop_vent_num <- dbGetQueryBothTrusts(db, vent_value_num)
 
 #Check for NAs
 sum(is.na(omop_vent_char))
@@ -376,7 +376,7 @@ visit_occ_query <- paste0("SELECT visit_occurrence_id,
                                   visit_end_datetime
                            FROM visit_occurrence")
 
-omop_visit_occurrence <- dbGetQuery(db, visit_occ_query)
+omop_visit_occurrence <- dbGetQueryBothTrusts(db, visit_occ_query)
 
 #Join visit occurrence
 phenotype <- phenotype %>%
@@ -477,7 +477,7 @@ phenotype2 = phenotype %>% mutate(
                                           ))
 
 
-phenotype2$hospital_site = ifelse(phenotype2$visit_occurrence_id %% 10 == 4, "UHB", "UCLH")
+phenotype2$hospital_site = ifelse(phenotype2$schema == "uhb", "UHB", "UCLH")
 
 phenotype2 = phenotype2 %>%
             mutate(covid_any=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"),
@@ -520,7 +520,7 @@ omop_visit_occurrence$visit_occurrence_id_char<- as.character(omop_visit_occurre
 summaryPhenotype_all <- left_join(omop_visit_occurrence,phenotype_max2_any, by=c("visit_occurrence_id_char"))
 summaryPhenotype_all$vent_status_num_max_all <- ifelse(is.na(summaryPhenotype_all$vent_status_num_max), 1, summaryPhenotype_all$vent_status_num_max)
 summaryPhenotype_all$covid_any_all <- ifelse(as.character(summaryPhenotype_all$visit_occurrence_id) %in% as.character(omop_covid_all$visit_occurrence_id), "Yes", "No")
-summaryPhenotype_all$hospital_site_all <- ifelse(summaryPhenotype_all$visit_occurrence_id %% 10 ==4, "UHB", "UCLH")
+summaryPhenotype_all$hospital_site_all <- ifelse(summaryPhenotype_all$schema == "uhb", "UHB", "UCLH")
 
 summaryPhenotype_all$vent_status_num_max_all <- as.character(summaryPhenotype_all$vent_status_num_max_all)
 summaryPhenotype_all$vent_status_num_max_all <- ifelse(summaryPhenotype_all$vent_status_num_max_all==0, 4, summaryPhenotype_all$vent_status_num_max_all)
