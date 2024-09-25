@@ -19,13 +19,13 @@ source("common-database.R")
 source("common-queries.R")
 
 #Run PCR Only Queries - distinct() is used to remove duplicates
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQueryBothTrusts(db, covid_pcr_query) %>%
   distinct()
 
 #Here, the COVID-19 cases based on clinical diagnoses (suspected and confirmed) are appended to the PCR only cases - again, distinct()
 #is used to remove duplicates
 omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query)) %>%
   distinct()
 
 #Before proceeding, specify the COVID-19 case type the data summaries should be based on.
@@ -47,63 +47,62 @@ covid_case_type <- omop_covid_all
 
 #Care site query with the # of days in each visit detail record from visit_detail table
 #This is the only we can calculate the number patient days in each level of care
-care_site_query_measurments <- paste0("SELECT * ,
-                                      visit_occurrence_id %10 as hospital_site,
+care_site_query_measurements <- paste0("SELECT * ,
                                       DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 AS patient_days
                                        FROM visit_detail")
 
-omop_care <- dbGetQuery(db, care_site_query_measurments) %>%
+omop_care <- dbGetQueryBothTrusts(db, care_site_query_measurements) %>%
                 distinct() %>%
                 mutate(care_site_id=as.character(care_site_id),
                        covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"),
                        hospital_site=case_when(
-                         hospital_site==4 ~ "UHB",
-                         hospital_site==6 ~ "UCLH"))
+                         schema=="uhb" ~ "UHB",
+                         schema=="uclh" ~ "UCLH"))
 
 #Read in measurements of interest - which the csv can be modified
 measurement <- read.csv("measurements_filtered.csv") %>%
                 dplyr::rename(measurement_concept_id=concept_id)
 
 #This query pulls all measurement records for the measurements read in the csv file above
-measurement_query <- paste0("SELECT DISTINCT * FROM
+measurement_query <- paste0("SELECT DISTINCT d.*, measurement_concept_name FROM
                         (SELECT visit_occurrence_id,
-                                visit_occurrence_id %10 as hospital_site,
-                                day,
+                                day_number,
                                 length_of_stay,
                                 visit_detail_id,
                                 care_site_id,
                                 measurement_concept_id,
-                                COUNT(measurement_concept_id) FROM
-                        (SELECT visit_occurrence_id,
+                                COUNT(measurement_concept_id) as measurement_concept_id_count FROM
+                        (SELECT a.visit_occurrence_id,
                                 visit_detail_id,
                                 care_site_id,
                                 measurement_datetime,
                                 visit_detail_end_datetime,
                                 visit_detail_start_datetime,
                                 (CASE
-                                  WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
-                                  ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                                  WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)=0 THEN 1
+                                  ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440) END) AS day_number,
                                (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
                         (SELECT visit_occurrence_id,
                                 visit_detail_start_datetime,
                                 visit_detail_end_datetime,
                                 visit_detail_id,
                                 care_site_id FROM visit_detail
-                        WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
+                        WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1)) a
                         LEFT JOIN
                         (SELECT visit_occurrence_id,
                                 measurement_datetime,
                                 measurement_concept_id FROM measurement
-                        	   WHERE measurement_concept_id IN (",
-                            paste0(paste0("'", measurement %>% filter(!(category %in% c("blood_gas","blood_pressure", "RR Man", "RR Spont","news2Resp", "resp" ))) %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
+                            WHERE measurement_concept_id IN (",
+                            paste0(paste0("'", measurement %>% filter(!(category %in% c("blood_gas","blood_pressure", "RR Man", "RR Spont","news2Resp", "resp" )))
+                            %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
                             GROUP BY visit_occurrence_id,
                                      measurement_datetime,
                                      measurement_concept_id) b
-                        ON (visit_occurrence_id)) c
-                        WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
+                        ON (a.visit_occurrence_id = b.visit_occurrence_id)) c
+                        WHERE ((measurement_datetime >= visit_detail_start_datetime) AND (measurement_datetime <= visit_detail_end_datetime))
                         GROUP BY visit_occurrence_id,
                                  visit_detail_id,
-                                 day,
+                                 day_number,
                                  length_of_stay,
                                  measurement_concept_id,
                                  care_site_id) d
@@ -115,78 +114,77 @@ measurement_query <- paste0("SELECT DISTINCT * FROM
 #type for the summary and it is easier to alise these measures in a separate query.
 measurement_query_blood <- paste0("SELECT DISTINCT * FROM
                             (SELECT visit_occurrence_id,
-                                    visit_occurrence_id %10 as hospital_site,
-                                    day,
+                                    day_number,
                                     length_of_stay,
                                     visit_detail_id,
                                     care_site_id,
-                                    measurement_concept AS measurement_concept_id,
-                                    'Blood_pressure' AS measurement_concept_name,
-                                    COUNT(measurement_concept) FROM
-                            (SELECT visit_occurrence_id,
+                                    measurement_concept_id,
+                                    'blood_pressure' AS measurement_concept_name,
+                                    COUNT(measurement_concept_id) as measurement_concept_id_count FROM
+                            (SELECT a.visit_occurrence_id,
                                     visit_detail_id,
                                     care_site_id,
                                     measurement_datetime,
                                     visit_detail_end_datetime,
                                     visit_detail_start_datetime,
                                    (CASE
-                                      WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
-                                      ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                                      WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)=0 THEN 1
+                                      ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440) END) AS day_number,
                                    (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
                             (SELECT visit_occurrence_id,
                                     visit_detail_start_datetime,
                                     visit_detail_end_datetime,
                                     visit_detail_id,
                                     care_site_id FROM visit_detail
-                            WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
+                            WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1)) a
                             LEFT JOIN
                             (SELECT visit_occurrence_id,
                             measurement_datetime,
-                            'blood_pressure' AS measurement_concept
+                            measurement_concept_id,
+                            'blood_pressure' AS measurement_concept_name
                                     FROM measurement
                             	   WHERE measurement_concept_id IN (",
                                 paste0(paste0("'", measurement %>% filter(category == "blood_pressure") %>% pull(measurement_concept_id), "'", collapse=",")), ") AND visit_occurrence_id IS NOT NULL
                                 GROUP BY visit_occurrence_id,
                                 measurement_datetime,
-                                measurement_concept) b
+                                measurement_concept_id) b
                             ON (a.visit_occurrence_id = b.visit_occurrence_id)) c
-                            WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
+                            WHERE ((measurement_datetime >= visit_detail_start_datetime) AND (measurement_datetime <= visit_detail_end_datetime))
                             GROUP BY visit_occurrence_id,
                                      visit_detail_id,
-                                     day,
+                                     day_number,
                                      length_of_stay,
-                                     measurement_concept,
+                                     measurement_concept_id,
                                      care_site_id) d")
 
 
 #Blood gases require additional tables to be queried, so this is also done separately.
-bloodgas_query <- paste0("SELECT * FROM
+bloodgas_query <- paste0("SELECT g.*, measurement_concept_name FROM
                                       (SELECT DISTINCT visit_occurrence_id,
-                                              visit_occurrence_id %10 as hospital_site,
-                                              day,
+                                              day_number,
                                               length_of_stay,
                                               visit_detail_id,
                                               care_site_id,
                                               measurement_concept_id,
-                                              COUNT(measurement_concept_id) FROM
-                                      (SELECT visit_occurrence_id,
+                                              COUNT(measurement_concept_id) as measurement_concept_id_count FROM
+                                      (SELECT a.visit_occurrence_id,
                                               visit_detail_id,
                                               care_site_id,
                                               measurement_datetime,
                                               visit_detail_end_datetime,
                                               visit_detail_start_datetime,
                                              (CASE
-                                            WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440))=0 THEN 1
-                                            ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)) END) AS day,
+                                            WHEN CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440)=0 THEN 1
+                                            ELSE CEILING(DATEDIFF(minute, visit_detail_start_datetime, measurement_datetime) / 1440) END) AS day_number,
                                          (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440) AS length_of_stay, measurement_concept_id FROM
                                   (SELECT visit_occurrence_id,
                                           visit_detail_start_datetime,
                                           visit_detail_end_datetime,
                                           visit_detail_id,
                                           care_site_id FROM visit_detail
-                                  WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1) a
+                                  WHERE (DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 >=1)) a
                                       LEFT JOIN
-                                      (SELECT * FROM
+                                      (SELECT b.*, c.specimen_id, d.anatomic_site_concept_id FROM
                                       (SELECT visit_occurrence_id,
                                               measurement_id,
                                               measurement_datetime,
@@ -206,11 +204,11 @@ bloodgas_query <- paste0("SELECT * FROM
                                       (SELECT specimen_id,
                                                 anatomic_site_concept_id
                                        FROM specimen WHERE anatomic_site_concept_id = 4136257) d
-                                      ON (c.specimen_id = e.specimen_id)) e
-                                      ON (a.visit_occurrence_id = b.visit_occurrence_id)) f
-                                      WHERE ((measurement_datetime::timestamp >= visit_detail_start_datetime::timestamp) AND (measurement_datetime::timestamp <= visit_detail_end_datetime::timestamp))
+                                      ON (c.specimen_id = d.specimen_id)) e
+                                      ON (a.visit_occurrence_id = e.visit_occurrence_id)) f
+                                      WHERE ((measurement_datetime >= visit_detail_start_datetime) AND (measurement_datetime <= visit_detail_end_datetime))
                                       GROUP BY visit_occurrence_id,
-                                               day,
+                                               day_number,
                                                length_of_stay,
                                                measurement_concept_id,
                                                visit_detail_id,
@@ -220,14 +218,14 @@ bloodgas_query <- paste0("SELECT * FROM
                                       ON (g.measurement_concept_id = h.measurement_concept_id)")
 
 #Warning: this takes 15-20 minutes to run until the join.
-omop_measure_all <- dbGetQuery(db, measurement_query) %>%
-                rbind(dbGetQuery(db, measurement_query_blood))  %>%
-                rbind(dbGetQuery(db, bloodgas_query)) %>%
+omop_measure_all <- dbGetQueryBothTrusts(db, measurement_query) %>%
+                rbind(dbGetQueryBothTrusts(db, measurement_query_blood))  %>%
+                rbind(dbGetQueryBothTrusts(db, bloodgas_query)) %>%
                     distinct() %>%
                     mutate(covid=ifelse(visit_occurrence_id %in% covid_case_type$visit_occurrence_id, "Yes", "No"),
                            hospital_site=case_when(
-                             hospital_site==4 ~ "UHB",
-                             hospital_site==6 ~ "UCLH")) %>%
+                             schema=="uhb" ~ "UHB",
+                             schema=="uclh" ~ "UCLH")) %>%
                     left_join(measurement %>% select(measurement_concept_id, category), by="measurement_concept_id")
 
 
@@ -275,7 +273,7 @@ for (i in 1:length(unique(omop_measure_all$measurement_concept_name))) {
      #We want to only include measurements that occurred within the last patient, no
      #partial days are to be included.
      Measurement_l2_l3 = Measurement_l2_l3 %>%
-                          filter(day <= floor(patient_days))
+                          filter(day_number <= floor(patient_days))
 
      #Determine which visits do not have any measurements in complete 24-hour blocks.
      #This is to add 0s back into the dataset for median.
@@ -285,7 +283,7 @@ for (i in 1:length(unique(omop_measure_all$measurement_concept_name))) {
      #Note, could save these data tables each loop.
      Measurement_l2_l3_sum = Measurement_l2_l3 %>%
                              group_by(visit_detail_id) %>%
-                             dplyr::summarise(n_days=n(),count=sum(count), earliest_day=min(day), patient_days=max(floor(patient_days)))
+                             dplyr::summarise(n_days=n(),count=sum(measurement_concept_id_count), earliest_day=min(day_number), patient_days=max(floor(patient_days)))
 
      #Calculate frequency per patient day (24-hour blocks only) for each patient
      Measurement_l2_l3_sum$freq_per_day = Measurement_l2_l3_sum$count/Measurement_l2_l3_sum$patient_days
@@ -338,8 +336,8 @@ n_complete_windows_all_l2_l3_any_visit <- omop_care_l2_l3_any_visit_type %>%
 
 #Calculate mean and % missing for all measurements
 omop_count_all_l2_l3_any <- omop_measure_l2_l3_any_visit_type %>%
-                            filter(day <= floor(length_of_stay)) %>%
-                            mutate(count=as.numeric(count)) %>%
+                            filter(day_number <= floor(length_of_stay)) %>%
+                            mutate(count=as.numeric(measurement_concept_id_count)) %>%
                             group_by(covid, measurement_concept_name, hospital_site, category) %>% summarise(days_for_calc=n(),sum=sum(count)) %>%
                             left_join(n_complete_windows_all_l2_l3_any_visit, by=c("covid", "hospital_site")) %>%
                             mutate(mean = signif(sum/total_days, 2), missing=round(((total_days-days_for_calc)/total_days)*100, 1))
@@ -383,13 +381,13 @@ for (i in 1:length(unique(omop_measure_all$measurement_concept_name))) {
   Measurement_l1 = left_join(Measurement_l1,omop_care_l1_any_visit_type_join, by=c("visit_detail_id") )
 
   Measurement_l1 = Measurement_l1 %>%
-                    filter(day <= floor(patient_days))
+                    filter(day_number <= floor(patient_days))
 
   NoMeasurements = setdiff(as.character(omop_care_l1_any_visit_type$visit_detail_id), as.character(Measurement_l1$visit_detail_id))
 
   Measurement_l1_sum = Measurement_l1 %>%
                         group_by(visit_detail_id) %>%
-                        dplyr::summarise(n_days=n(),count=sum(count), earliest_day=min(day), patient_days=max(floor(patient_days)))
+                        dplyr::summarise(n_days=n(),count=sum(measurement_concept_id_count), earliest_day=min(day_number), patient_days=max(floor(patient_days)))
 
   Measurement_l1_sum$freq_per_day = Measurement_l1_sum$count/Measurement_l1_sum$patient_days
 
@@ -428,8 +426,8 @@ n_complete_windows_all_l1_any_visit_type <- omop_care_l1_any_visit_type %>%
 
 #This code summarises the data for each patient by measurement.
 omop_count_all_l1_any_visit_type <- omop_measure_l1_any_visit_type %>%
-                                    filter(day <=floor(length_of_stay)) %>%
-                                    mutate(count=as.numeric(count)) %>%
+                                    filter(day_number <=floor(length_of_stay)) %>%
+                                    mutate(count=as.numeric(measurement_concept_id_count)) %>%
                                     group_by(covid, measurement_concept_name, hospital_site, category) %>% summarise(days_for_calc=n(),sum=sum(count)) %>%
                                     left_join(n_complete_windows_all_l1_any_visit_type, by=c("covid", "hospital_site")) %>%
                                     mutate(mean = signif(sum/total_days, 2), missing=round(((total_days-days_for_calc)/total_days)*100, 1))
