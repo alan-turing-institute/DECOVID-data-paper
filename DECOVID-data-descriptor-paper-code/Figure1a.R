@@ -32,18 +32,17 @@ source("common-database.R")
 source("common-queries.R")
 
 #Run PCR Only Queries
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQueryBothTrusts(db, covid_pcr_query) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
 omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query)) %>%
   distinct()
 
 #Query DECOVID for person-level summaries included
 #in Figure 1a
-person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
-                                     a.person_id,
+person_level_table <- paste0("SELECT a.person_id,
                                      a.year_of_birth,
                                      b.visit_count,
                                      b.Index_Visit_Date,
@@ -53,7 +52,7 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                                     f.covid,
                                     f.COVID_Visit_Date,
                                     (CASE WHEN f.COVID_Visit_Date IS NULL THEN b.Index_Visit_Date
-                                    ELSE f.COVID_Visit_Date END) AS Date_for_Age
+                                    ELSE f.COVID_Visit_Date END) AS date_for_age
                              FROM
                              (SELECT person_id,
                                      race_concept_id,
@@ -63,7 +62,7 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                              FROM person) a
                              LEFT JOIN
                              (SELECT person_id,
-                                     MIN(visit_start_date) AS Index_Visit_Date,
+                                     MIN(CAST(visit_start_datetime as date)) AS Index_Visit_Date,
                                      COUNT(visit_occurrence_id) as visit_count
                              FROM  visit_occurrence
                              GROUP BY person_id) b
@@ -85,7 +84,7 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                              ON a.location_id=e.location_id
                              LEFT JOIN
                              (SELECT  DISTINCT person_id,
-                                      MIN(visit_start_date) as COVID_Visit_Date,
+                                      MIN(CAST(visit_start_datetime as date)) as COVID_Visit_Date,
                                       COUNT(DISTINCT person_id) as covid
                              FROM visit_occurrence
                              WHERE visit_occurrence_id IN (",paste0(paste0("'", omop_covid_all %>%pull(visit_occurrence_id), "'", collapse=",")), ")
@@ -93,7 +92,7 @@ person_level_table <- paste0("SELECT a.person_id % 10 as hospital_site,
                              ON a.person_id=f.person_id")
 
 
-omop_person_table <- dbGetQuery(db, person_level_table) %>%
+omop_person_table <- dbGetQueryBothTrusts(db, person_level_table) %>%
   distinct() %>%
   mutate(gender_concept_name=tolower(gender_concept_name) %>% Hmisc::capitalize(),
          gender_concept_name=ifelse(gender_concept_name=="Unknown" | gender_concept_name=="No matching concept", "Unknown", gender_concept_name),
@@ -106,7 +105,7 @@ omop_person_table <- dbGetQuery(db, person_level_table) %>%
            race_concept_name=="Ethnicity not stated" | race_concept_name=="Unknown racial group" ~ "Unknown"),
          race_concept_name=NULL,
          covid=ifelse(is.na(covid), "No", "Yes"),
-         hospital_site = ifelse(hospital_site==4, "UHB", "UCLH"),
+         hospital_site = ifelse(schema=="uhb", "UHB", "UCLH"),
          visit_count=as.numeric(visit_count))
 
 ########################################
@@ -280,12 +279,12 @@ covid_pcr_query_plot <- paste("SELECT a.visit_occurrence_id,
                         INNER JOIN
                         (SELECT visit_occurrence_id,
                                 person_id,
-                                visit_start_date,
-                                visit_end_date
+                                visit_start_datetime,
+                                visit_end_datetime
                                 FROM visit_occurrence) d
                         ON (a.visit_occurrence_id = d.visit_occurrence_id)
-                        WHERE ( DATEDIFF(day,  visit_start_date,  specimen_date) <= 14 AND (specimen_date <=visit_end_date))
-                        OR ( DATEDIFF(day, visit_start_date, specimen_date) <= 14 AND (visit_end_date IS NULL))")
+                        WHERE ( DATEDIFF(day,  CAST(visit_start_datetime as date),  specimen_date) <= 14 AND (specimen_date <= CAST(visit_end_datetime as date)))
+                        OR ( DATEDIFF(day, CAST(visit_start_datetime as date), specimen_date) <= 14 AND (CAST(visit_end_datetime as date) IS NULL))")
 
 #Confirmed/suspected COVID-19 Query
 covid_obs_all_query_plot <- paste("SELECT a.visit_occurrence_id, person_id, 'CONDITION' AS case_type,
@@ -296,22 +295,22 @@ covid_obs_all_query_plot <- paste("SELECT a.visit_occurrence_id, person_id, 'CON
                               37310287, 45604597, 37311060, 703440, 37310282,
                               439676, 45585955, 37311061, 45756093, 45756094,
                               320651, 37310268)) a
-                              INNER JOIN (SELECT visit_start_date,
-                                                 visit_end_date,
+                              INNER JOIN (SELECT visit_start_datetime,
+                                                 visit_end_datetime,
                                                  visit_occurrence_id
                                                  FROM visit_occurrence) b
                               ON (a.visit_occurrence_id = b.visit_occurrence_id)
-                              WHERE (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (condition_start_date <=visit_end_date))
-                              OR (DATEDIFF(day, visit_start_date, condition_start_date) <= 14 AND (visit_end_date IS NULL))")
+                              WHERE (DATEDIFF(day, CAST(visit_start_datetime as date), condition_start_date) <= 14 AND (condition_start_date <= CAST(visit_end_datetime as date)))
+                              OR (DATEDIFF(day, CAST(visit_start_datetime as date), condition_start_date) <= 14 AND (CAST(visit_end_datetime as date) IS NULL))")
 
 
 #Run PCR Only Queries
-omop_covid_pcr_plot <- dbGetQuery(db, covid_pcr_query_plot) %>%
+omop_covid_pcr_plot <- dbGetQueryBothTrusts(db, covid_pcr_query_plot) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
 omop_covid_all_plot <- omop_covid_pcr_plot %>%
-  rbind(dbGetQuery(db, covid_obs_all_query_plot)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query_plot)) %>%
   distinct()
 
 #Let's arrange by visit_occurrence_id, descending order by case type
@@ -324,7 +323,7 @@ omop_covid_all_plot_sort <- omop_covid_all_plot %>%
 omop_covid_all_plot_sort <- omop_covid_all_plot_sort[!duplicated(omop_covid_all_plot_sort$visit_occurrence_id),]
 
 #Create field for hospital Trust
-omop_covid_all_plot_sort$hospital_site <- ifelse(omop_covid_all_plot_sort$visit_occurrence_id %% 10 ==4, "UHB", "UCLH")
+omop_covid_all_plot_sort$hospital_site <- ifelse(omop_covid_all_plot_sort$schema=="uhb", "UHB", "UCLH")
 
 #Generate a column for week, as the plot will be by week
 omop_covid_all_plot_sort$week <- cut((omop_covid_all_plot_sort$covid_date), "week")
@@ -367,7 +366,7 @@ write.csv(omop_covid_weekly, "omop_covid_weekly_DECOVIDPaper.csv", na="", row.na
 ####################################################
 
 #Pull all condition data for all research questions.
-omop_cond_all_v2 <- dbGetQuery(db, condition_q) %>%
+omop_cond_all_v2 <- dbGetQueryBothTrusts(db, condition_q) %>%
   distinct()
 
 #The following code serves as a way
@@ -377,19 +376,19 @@ omop_cond_all_v2 <- dbGetQuery(db, condition_q) %>%
 concept_relationship_q <- paste0("SELECT *
                                 FROM concept_relationship")
 
-concept_relationship_table <- dbGetQuery(db, concept_relationship_q)
+concept_relationship_table <- dbGetQueryBothTrusts(db, concept_relationship_q, schemas = "dbo")
 
 #Load concept_ancestor table
 concept_ancestor_q <- paste0("SELECT *
                               FROM concept_ancestor")
 
-concept_ancestor_table <- dbGetQuery(db, concept_ancestor_q)
+concept_ancestor_table <- dbGetQueryBothTrusts(db, concept_ancestor_q, schemas = "dbo")
 
 #Load concept table
 concept_q <- paste0("SELECT *
                       FROM concept")
 
-concept <- dbGetQuery(db, concept_q)
+concept <- dbGetQueryBothTrusts(db, concept_q, schemas = "dbo")
 
 #Find all conditions that have a "standard" mapping
 concept_relationship_table_standard_conditions <- concept_relationship_table %>%
@@ -426,7 +425,7 @@ missing_standard_cond <- setdiff(omop_cond_all_v2$condition_concept_id, conditio
 
 Nonstandard <- concept %>% filter(concept_id %in% missing_standard_cond) %>% select(concept_id, concept_name)
 
-omop_cond_all_v2$hospital_site <- ifelse(omop_cond_all_v2$visit_occurrence_id %% 10 ==4, "UHB", "UCLH")
+omop_cond_all_v2$hospital_site <- ifelse(omop_cond_all_v2$schema == "uhb", "UHB", "UCLH")
 
 #comorbidities
 
