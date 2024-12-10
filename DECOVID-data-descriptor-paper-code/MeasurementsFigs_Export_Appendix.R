@@ -16,18 +16,17 @@ source("common-database.R")
 source("common-queries.R")
 
 #Run PCR Only Queries
-omop_covid_pcr <- dbGetQuery(db, covid_pcr_query) %>%
+omop_covid_pcr <- dbGetQueryBothTrusts(db, covid_pcr_query) %>%
   distinct()
 
 #Combine with all - this is used for the final Table 1.
 omop_covid_all <- omop_covid_pcr %>%
-  rbind(dbGetQuery(db, covid_obs_all_query)) %>%
+  rbind(dbGetQueryBothTrusts(db, covid_obs_all_query)) %>%
   distinct()
 
-visit_query_org <- paste0("SELECT visit_occurrence_id, a.person_id, gender_concept_name, race_concept_name, year_of_birth, hospital_site, visit_start_date, visit_end_date, admitting_source_concept_name, discharge_to_concept_name, patient_days FROM
+visit_query_org <- paste0("SELECT visit_occurrence_id, a.person_id, gender_concept_name, race_concept_name, year_of_birth, visit_start_date, visit_end_date, admitting_source_concept_name, discharge_to_concept_name, patient_days FROM
                         (SELECT visit_occurrence_id, person_id, visit_start_date, visit_end_date, admitting_source_concept_id, discharge_to_concept_id,
-                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 1440) AS patient_days,
-                        visit_occurrence_id %10 AS hospital_site
+                             (DATEDIFF(minute, visit_start_datetime, visit_end_datetime) / 1440) AS patient_days
                         FROM visit_occurrence) a
                         LEFT JOIN
                         (SELECT gender_concept_id, race_concept_id, person_id, year_of_birth
@@ -51,7 +50,7 @@ visit_query_org <- paste0("SELECT visit_occurrence_id, a.person_id, gender_conce
                         ON (a.admitting_source_concept_id = f.admitting_source_concept_id)")
 
 
-omop_visit_all_org <- dbGetQuery(db, visit_query_org) %>%
+omop_visit_all_org <- dbGetQueryBothTrusts(db, visit_query_org) %>%
   mutate(covid=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"))
 
 
@@ -70,8 +69,8 @@ omop_visit_clean_all_org <- omop_visit_all_org %>%
     race_concept_name=="Ethnicity not stated" | race_concept_name=="Unknown racial group" ~ "Unknown"),
     race_concept_name=NULL) %>%
   mutate(hospital_site=case_when(
-    hospital_site==4 ~ "UHB",
-    hospital_site==6 ~ "UCLH")) %>%
+    schema == "uhb" ~ "UHB",
+    schema == "uclh" ~ "UCLH")) %>%
   mutate(patient_days=ifelse(patient_days < 0, NA, patient_days)) %>%
   mutate(gender_concept_name=tolower(gender_concept_name) %>% Hmisc::capitalize(),
          gender_concept_name=ifelse(gender_concept_name=="Unknown" | gender_concept_name=="No matching concept", "Unknown", gender_concept_name)) %>%
@@ -116,7 +115,6 @@ omop_visit_clean_all_org <- omop_visit_all_org %>%
       "gender_concept_name",
       "ethnicity_group",
       "covid",
-      "hospital_site",
       "admitting_source_concept_name",
       "discharge_to_concept_name",
       "l2_l3",
@@ -129,13 +127,13 @@ omop_visit_clean_all_org <- omop_visit_all_org %>%
             as.numeric)
 
 #Load in visit data
-omop_visit_all <- dbGetQuery(db, visit_query)
+omop_visit_all <- dbGetQueryBothTrusts(db, visit_query)
 
 #Care Site query
 care_site_query <- paste0("SELECT care_site_id, visit_occurrence_id FROM
                           visit_detail")
 
-omop_care <- dbGetQuery(db, care_site_query) %>%
+omop_care <- dbGetQueryBothTrusts(db, care_site_query) %>%
   distinct() %>%
   mutate(care_site_id=as.numeric(care_site_id))
 
@@ -170,8 +168,8 @@ omop_visit_clean_all <- omop_visit_all %>%
 
 
   mutate(hospital_site=case_when(
-    hospital_site==4 ~ "UHB",
-    hospital_site==6 ~ "UCLH")) %>%
+    schema == "uhb" ~ "UHB",
+    schema == "uclh" ~ "UCLH")) %>%
 
 
   mutate(patient_hours=ifelse(patient_hours < 0, NA, patient_hours)) %>%
@@ -263,13 +261,13 @@ care_site_query_measurments <- paste0("SELECT * ,
                                       DATEDIFF(minute, visit_detail_start_datetime, visit_detail_end_datetime) / 1440 AS patient_days
                                        FROM visit_detail")
 
-omop_care <- dbGetQuery(db, care_site_query_measurments) %>%
+omop_care <- dbGetQueryBothTrusts(db, care_site_query_measurments) %>%
   distinct() %>%
   mutate(care_site_id=as.character(care_site_id),
          covid=ifelse(visit_occurrence_id %in% omop_covid_all$visit_occurrence_id, "Yes", "No"),
          hospital_site=case_when(
-           hospital_site==4 ~ "UHB",
-           hospital_site==6 ~ "UCLH"))
+           schema == "uhb" ~ "UHB",
+           schema == "uclh" ~ "UCLH"))
 
 
 #Read in measurements of interest
@@ -277,7 +275,7 @@ library(lubridate)
 library(hms)
 library(dplyr)
 
-measurement <- read.csv("//idhs.ucl.ac.uk/user/User_Data/idhsnba/My Documents/R/win-library/3.6/measurements_filtered.csv") %>%
+measurement <- read.csv("measurements_filtered.csv") %>%
                dplyr::rename(measurement_concept_id=concept_id)
 
 measurement_nobp_no_resp <- measurement %>%
@@ -289,10 +287,7 @@ for (i in 1:length(measurement_nobp_no_resp$measurement_concept_id)) {
 meas_q_figs <- paste0("SELECT a.*,
                          b.measurement_concept_name,
                          b.concept_class_id_measurement,
-                         b.vocabulary_id_measurement,
-                          (CASE WHEN a.visit_occurrence_id IS NOT NULL THEN a.visit_occurrence_id %10
-                                WHEN a.person_id IS NOT NULL THEN a.person_id %10
-                                ELSE NULL END) as hospital_site
+                         b.vocabulary_id_measurement
                       FROM
                       (SELECT *
                       FROM measurement
@@ -307,12 +302,12 @@ meas_q_figs <- paste0("SELECT a.*,
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
+omop_meas_all <- dbGetQueryBothTrusts(db, meas_q_figs) %>%
                   distinct()
 
 omop_meas_all <- omop_meas_all %>%
-                  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"),
+                  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"),
                  covid=if_else(as.character(visit_occurrence_id) %in% as.character(omop_covid_all$visit_occurrence_id), "COVID-19", "Non-COVID-19"))
 
 omop_care$visit_detail_id_char <- as.character(omop_care$visit_detail_id)
@@ -360,10 +355,7 @@ measurement_bp <- measurement %>%
 meas_q_figs <- paste0("SELECT a.*,
                          b.measurement_concept_name,
                          b.concept_class_id_measurement,
-                         b.vocabulary_id_measurement,
-                          (CASE WHEN a.visit_occurrence_id IS NOT NULL THEN a.visit_occurrence_id %10
-                                WHEN a.person_id IS NOT NULL THEN a.person_id %10
-                                ELSE NULL END) as hospital_site
+                         b.vocabulary_id_measurement
                       FROM
                       (SELECT *
                       FROM measurement
@@ -378,12 +370,12 @@ meas_q_figs <- paste0("SELECT a.*,
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
+omop_meas_all <- dbGetQueryBothTrusts(db, meas_q_figs) %>%
     distinct()
 
 omop_meas_all <- omop_meas_all %>%
-    mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                     hospital_site==6 ~ "UCLH"),
+    mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                     schema == "uclh" ~ "UCLH"),
            covid=if_else(as.character(visit_occurrence_id) %in% as.character(omop_covid_all$visit_occurrence_id), "COVID-19", "Non-COVID-19"))
 
 omop_care$visit_detail_id_char <- as.character(omop_care$visit_detail_id)
@@ -439,10 +431,7 @@ measurement_rr <- measurement %>%
 meas_q_figs <- paste0("SELECT a.*,
                          b.measurement_concept_name,
                          b.concept_class_id_measurement,
-                         b.vocabulary_id_measurement,
-                          (CASE WHEN a.visit_occurrence_id IS NOT NULL THEN a.visit_occurrence_id %10
-                                WHEN a.person_id IS NOT NULL THEN a.person_id %10
-                                ELSE NULL END) as hospital_site
+                         b.vocabulary_id_measurement
                       FROM
                       (SELECT *
                       FROM measurement
@@ -456,12 +445,12 @@ meas_q_figs <- paste0("SELECT a.*,
                       ON a.measurement_concept_id=b.measurement_id")
 
 
-omop_meas_all <- dbGetQuery(db, meas_q_figs) %>%
+omop_meas_all <- dbGetQueryBothTrusts(db, meas_q_figs) %>%
   distinct()
 
 omop_meas_all <- omop_meas_all %>%
-  mutate(hospital_site = case_when(hospital_site=hospital_site==4 ~ "UHB",
-                                   hospital_site==6 ~ "UCLH"),
+  mutate(hospital_site = case_when(schema == "uhb" ~ "UHB",
+                                   schema == "uclh" ~ "UCLH"),
          covid=if_else(as.character(visit_occurrence_id) %in% as.character(omop_covid_all$visit_occurrence_id), "COVID-19", "Non-COVID-19"))
 
 omop_care$visit_detail_id_char <- as.character(omop_care$visit_detail_id)
