@@ -1,0 +1,4 @@
+"visit_detail_concept_name","visit_detail_concept_id","UCLH","UHB"
+"Emergency Room Visit",9203,"<=10","106122"
+"Inpatient Visit",9201,"<=10","132967"
+"No matching concept",0,"164866","<=10"

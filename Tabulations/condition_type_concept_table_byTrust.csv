@@ -1,0 +1,6 @@
+"condition_type_concept_name","condition_type_concept_id","UCLH","UHB"
+"EHR billing diagnosis",32019,"776833","983488"
+"EHR Chief Complaint",42894222,"<=10","103017"
+"EHR encounter diagnosis",32020,"417554","128867"
+"EHR problem list entry",38000245,"195442","15934"
+"Past medical history",40301556,"15181","<=10"
