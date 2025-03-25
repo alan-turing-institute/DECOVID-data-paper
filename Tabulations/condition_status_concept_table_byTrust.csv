@@ -1,0 +1,5 @@
+"condition_status_concept_name","condition_status_concept_id","UCLH","UHB"
+"Admitting diagnosis","4203942","<=10","107724"
+"Final diagnosis (discharge)","4230359","776833","1093989"
+"Preliminary diagnosis","4033240","<=10","15934"
+"NULL","0","628177","13659"
