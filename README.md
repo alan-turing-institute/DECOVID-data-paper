@@ -12,23 +12,34 @@ Raw data were extracted from local EHRs and transformed into the [Observational 
 
 These data include longitudinal physiology, treatments, laboratory findings, diagnoses and outcomes.
 
-There are  includes 165,420 patients across 256,804 hospital presentations; 16.7 million hours of clinical care; 3,752 deaths (both COVID-19- and non-COVID-19-related); 108 million measured clinical observations encompassing vital signs, acute physiology and laboratory findings; 2.64 million clinical diagnoses relating to both acute and chronic health conditions; and 15.19 million drug administration events.
+he database includes 165,420 patients across 256,804 hospital presentations; 16.7 million hours of clinical care; 3,752 deaths (both COVID-19- and non-COVID-19-related); 108 million measured clinical observations encompassing vital signs, acute physiology and laboratory findings; 2.64 million clinical diagnoses relating to both acute and chronic health conditions; and 15.19 million drug administration events.
 
 ## Data access information
-
+See https://healthdatagateway.org/en/dataset/998
 
 ## Contact information
 
 
 ## Links:
-* **DECOVID Code** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Tabulations)
+Information about the dataset:
+* **DECOVID Tabulations** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Tabulations)
    * This folder contains high level tabulations of the concepts in the DECOVID dataset.
+* **DECOVID exclusion lists** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Exclusion-Lists)
+  * This folder contains lists of excluded diagnoses
+* **DECOVID care sites mapping** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Mapping/care_sites.csv)
+  * Contains the mapping used for care sites in the DECOVID database (this is a non-standard vocabulary)
+
+Code:
 * **DECOVID Code** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/DECOVID-data-descriptor-paper-code)
    * This folder contains the code used for the figures in the data paper.
-* **Data Quality Information** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Data-quality-information)
-  * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
+* **DECOVID Data Definition Language (DDL)** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Data-Definition-Language)
+  * This folder the DDL for the dataset.
+
+Other information:
 * **OMOP Wiki** - [link to wiki](https://github.com/alan-turing-institute/DECOVID-data-paper/wiki/OMOP-wiki)
   * The wiki contains information about the specific version of OMOP used in this dataset. The OMOP data model version 5.3 is being used as the common data model for DECOVID.
+* **DECOVID Protocol** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Protocol/Protocol.pdf)
+   * Original study protocol
 
 ## License:
 ### For documentation:
