@@ -25,8 +25,6 @@ There are  includes 165,420 patients across 256,804 hospital presentations; 16.7
    * This folder contains high level tabulations of the concepts in the DECOVID dataset.
 * **DECOVID Code** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/DECOVID-data-descriptor-paper-code)
    * This folder contains the code used for the figures in the data paper.
-* **DECOVID Data Tables** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Decovid-data-tables)
-  * This folder contains metadata about the data collected in each of the data tables.
 * **Data Quality Information** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Data-quality-information)
   * This folder contains information about the specific data quality performed on the dataset. This includes code used and outputs of data quality work.
 * **OMOP Wiki** - [link to wiki](https://github.com/alan-turing-institute/DECOVID-data-paper/wiki/OMOP-wiki)
