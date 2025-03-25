@@ -1,0 +1,270 @@
+CODE,TERM
+N97,Female infertility
+N970,Female infertility associated with anovulation
+N971,Female infertility of tubal origin
+N972,Female infertility of uterine origin
+N973,Female infertility of cervical origin
+N974,Female infertility associated with male factors
+N978,Female infertility of other origin
+N979,"Female infertility, unspecified"
+N98,Complications associated with artificial fertilization
+N980,Infection associated with artificial insemination
+N981,Hyperstimulation of ovaries
+N982,Complications of attempted introduction of fertilized ovum following in vitro fertilization
+N983,Complications of attempted introduction of embryo in embryo transfer
+N988,Other complications associated with artificial fertilization
+N989,"Complication associated with artificial fertilization, unspecified"
+Y658,Other specified misadventures during surgical and medical care
+Z31,Procreative management
+Z310,Tuboplasty or vasoplasty after previous sterilization
+Z311,Artificial insemination
+Z312,In vitro fertilization
+Z313,Other assisted fertilization methods
+Z314,Procreative investigation and testing
+Z315,Genetic counselling
+Z316,General counselling and advice on procreation
+Z318,Other procreative management
+Z319,"Procreative management, unspecified"
+Z928,Personal history of other medical treatment
+A50,Congenital syphilis
+A500,"Early congenital syphilis, symptomatic"
+A501,"Early congenital syphilis, latent"
+A502,"Early congenital syphilis, unspecified"
+A503,Late congenital syphilitic oculopathy
+A504,Late congenital neurosyphilis [juvenile neurosyphilis]
+A505,"Other late congenital syphilis, symptomatic"
+A506,"Late congenital syphilis, latent"
+A507,"Late congenital syphilis, unspecified"
+A509,"Congenital syphilis, unspecified"
+A51,Early syphilis
+A510,Primary genital syphilis
+A511,Primary anal syphilis
+A512,Primary syphilis of other sites
+A513,Secondary syphilis of skin and mucous membranes
+A514,Other secondary syphilis
+A515,"Early syphilis, latent"
+A519,"Early syphilis, unspecified"
+A52,Late syphilis
+A520,Cardiovascular syphilis
+A521,Symptomatic neurosyphilis
+A522,Asymptomatic neurosyphilis
+A523,"Neurosyphilis, unspecified"
+A527,Other symptomatic late syphilis
+A528,"Late syphilis, latent"
+A529,"Late syphilis, unspecified"
+A53,Other and unspecified syphilis
+A530,"Latent syphilis, unspecified as early or late"
+A539,"Syphilis, unspecified"
+A54,Gonococcal infection
+A540,Gonococcal infection of lower genitourinary tract without periurethral or accessory gland abscess
+A541,Gonococcal infection of lower genitourinary tract with periurethral and accessory gland abscess
+A542,Gonococcal pelviperitonitis and other gonococcal genitourinary infections
+A543,Gonococcal infection of eye
+A544,Gonococcal infection of musculoskeletal system
+A545,Gonococcal pharyngitis
+A546,Gonococcal infection of anus and rectum
+A548,Other gonococcal infections
+A549,"Gonococcal infection, unspecified"
+A55,Chlamydial lymphogranuloma (venereum)
+A56,Other sexually transmitted chlamydial diseases
+A560,Chlamydial infection of lower genitourinary tract
+A561,Chlamydial infection of pelviperitoneum and other genitourinary organs
+A562,"Chlamydial infection of genitourinary tract, unspecified"
+A563,Chlamydial infection of anus and rectum
+A564,Chlamydial infection of pharynx
+A568,Sexually transmitted chlamydial infection of other sites
+A57,Chancroid
+A58,Granuloma inguinale
+A59,Trichomoniasis
+A590,Urogenital trichomoniasis
+A598,Trichomoniasis of other sites
+A599,"Trichomoniasis, unspecified"
+A600,Herpesviral infection of genitalia and urogenital tract
+A601,Herpesviral infection of perianal skin and rectum
+A609,"Anogenital herpesviral infection, unspecified"
+A63,"Other predominantly sexually transmitted diseases, not elsewhere classified"
+A630,Anogenital (venereal) warts
+A638,Other specified predominantly sexually transmitted diseases
+A64,Unspecified sexually transmitted disease
+A70,Chlamydia psittaci infection
+A71,Trachoma
+A710,Initial stage of trachoma
+A711,Active stage of trachoma
+A719,"Trachoma, unspecified"
+A74,Other diseases caused by chlamydiae
+A740,Chlamydial conjunctivitis
+A748,Other chlamydial diseases
+A749,"Chlamydial infection, unspecified"
+B16,Acute hepatitis B
+B160,Acute hepatitis B with delta-agent (coinfection) with hepatic coma
+B161,Acute hepatitis B with delta-agent (coinfection) without hepatic coma
+B162,Acute hepatitis B without delta-agent with hepatic coma
+B169,Acute hepatitis B without delta-agent and without hepatic coma
+B170,Acute delta-(super)infection of hepatitis B carrier
+B171,Acute hepatitis C
+B178,Other specified acute viral hepatitis
+B179,"Acute viral hepatitis, unspecified"
+B18,Chronic viral hepatitis
+B180,Chronic viral hepatitis B with delta-agent
+B181,Chronic viral hepatitis B without delta-agent
+B182,Chronic viral hepatitis C
+B188,Other chronic viral hepatitis
+B189,"Chronic viral hepatitis, unspecified"
+B19,Unspecified viral hepatitis
+B190,Unspecified viral hepatitis with hepatic coma
+B199,Unspecified viral hepatitis without hepatic coma
+B20,Human immunodeficiency virus [HIV] disease resulting in infectious and parasitic diseases
+B200,HIV disease resulting in mycobacterial infection
+B201,HIV disease resulting in other bacterial infections
+B202,HIV disease resulting in cytomegaloviral disease
+B203,HIV disease resulting in other viral infections
+B204,HIV disease resulting in candidiasis
+B205,HIV disease resulting in other mycoses
+B206,HIV disease resulting in Pneumocystis jirovecii pneumonia
+B207,HIV disease resulting in multiple infections
+B208,HIV disease resulting in other infectious and parasitic diseases
+B209,HIV disease resulting in unspecified infectious or parasitic disease
+B21,Human immunodeficiency virus [HIV] disease resulting in malignant neoplasms
+B210,HIV disease resulting in Kaposi sarcoma
+B211,HIV disease resulting in Burkitt lymphoma
+B212,HIV disease resulting in other types of non-Hodgkin lymphoma
+B213,"HIV disease resulting in other malignant neoplasms of lymphoid, haematopoietic and related tissue"
+B217,HIV disease resulting in multiple malignant neoplasms
+B218,HIV disease resulting in other malignant neoplasms
+B219,HIV disease resulting in unspecified malignant neoplasm
+B22,Human immunodeficiency virus [HIV] disease resulting in other specified diseases
+B220,HIV disease resulting in encephalopathy
+B221,HIV disease resulting in lymphoid interstitial pneumonitis
+B222,HIV disease resulting in wasting syndrome
+B227,HIV disease resulting in multiple diseases classified elsewhere
+B23,Human immunodeficiency virus [HIV] disease resulting in other conditions
+B230,Acute HIV infection syndrome
+B231,HIV disease resulting in (persistent) generalized lymphadenopathy
+B232,"HIV disease resulting in haematological and immunological abnormalities, not elsewhere classified"
+B238,HIV disease resulting in other specified conditions
+B24,Unspecified human immunodeficiency virus [HIV] disease
+B25,Cytomegaloviral disease
+B250,Cytomegaloviral pneumonitis
+B251,Cytomegaloviral hepatitis
+B252,Cytomegaloviral pancreatitis
+B258,Other cytomegaloviral diseases
+B259,"Cytomegaloviral disease, unspecified"
+B344,"Papovavirus infection, unspecified site"
+B851,Pediculosis due to Pediculus humanus corporis
+B853,Phthiriasis
+B940,Sequelae of trachoma
+B942,Sequelae of viral hepatitis
+B977,Papillomavirus as the cause of diseases classified to other chapters
+D013,Carcinoma in situ: Anus and anal canal
+D045,Carcinoma in situ: Skin of trunk
+D049,"Carcinoma in situ: Skin, unspecified"
+D071,Carcinoma in situ: Vulva
+D074,Carcinoma in situ: Penis
+G958,Other specified diseases of spinal cord
+H208,Other iridocyclitis
+I980,Cardiovascular syphilis
+K004,Disturbances in tooth formation
+K140,Glossitis
+K746,Other and unspecified cirrhosis of liver
+M023,Reiter disease
+M0230,Reiter disease - Multiple sites
+M0231,Reiter disease - Shoulder region
+M0232,Reiter disease - Upper arm
+M0233,Reiter disease - Forearm
+M0234,Reiter disease - Hand
+M0235,Reiter disease - Pelvic region and thigh
+M0236,Reiter disease - Lower leg
+M0237,Reiter disease - Ankle and foot
+M0238,Reiter disease - Other
+M0239,Reiter disease - Site unspecified
+M031,Postinfective arthropathy in syphilis
+M0310,Postinfective arthropathy in syphilis - Multiple sites
+M0311,Postinfective arthropathy in syphilis - Shoulder region
+M0312,Postinfective arthropathy in syphilis - Upper arm
+M0313,Postinfective arthropathy in syphilis - Forearm
+M0314,Postinfective arthropathy in syphilis - Hand
+M0315,Postinfective arthropathy in syphilis - Pelvic region and thigh
+M0316,Postinfective arthropathy in syphilis - Lower leg
+M0317,Postinfective arthropathy in syphilis - Ankle and foot
+M0318,Postinfective arthropathy in syphilis - Other
+M0319,Postinfective arthropathy in syphilis - Site unspecified
+M730,Gonococcal bursitis
+M7300,Gonococcal bursitis - Multiple sites
+M7301,Gonococcal bursitis - Shoulder region
+M7302,Gonococcal bursitis - Upper arm
+M7303,Gonococcal bursitis - Forearm
+M7304,Gonococcal bursitis - Hand
+M7305,Gonococcal bursitis - Pelvic region and thigh
+M7306,Gonococcal bursitis - Lower leg
+M7307,Gonococcal bursitis - Ankle and foot
+M7308,Gonococcal bursitis - Other
+M7309,Gonococcal bursitis - Site unspecified
+M731,Syphilitic bursitis
+M7310,Syphilitic bursitis - Multiple sites
+M7311,Syphilitic bursitis - Shoulder region
+M7312,Syphilitic bursitis - Upper arm
+M7313,Syphilitic bursitis - Forearm
+M7314,Syphilitic bursitis - Hand
+M7315,Syphilitic bursitis - Pelvic region and thigh
+M7316,Syphilitic bursitis - Lower leg
+M7317,Syphilitic bursitis - Ankle and foot
+M7318,Syphilitic bursitis - Other
+M7319,Syphilitic bursitis - Site unspecified
+N290,Late syphilis of kidney
+N341,Nonspecific urethritis
+N742,Female syphilitic pelvic inflammatory disease
+N743,Female gonococcal pelvic inflammatory disease
+N744,Female chlamydial pelvic inflammatory disease
+O981,"Syphilis complicating pregnancy, childbirth and the puerperium"
+O982,"Gonorrhoea complicating pregnancy, childbirth and the puerperium"
+O983,"Other infections with a predominantly sexual mode of transmission complicating pregnancy, childbirth and the puerperium"
+O984,"Viral hepatitis complicating pregnancy, childbirth and the puerperium"
+O987,"Human immunodeficiency virus [HIV] disease complicating pregnancy, childbirth and the puerperium"
+O991,"Other diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism complicating pregnancy, childbirth and the puerperium"
+P231,Congenital pneumonia due to Chlamydia
+P352,Congenital herpesviral [herpes simplex] infection
+P353,Congenital viral hepatitis
+P398,Other specified infections specific to the perinatal period
+R75,Laboratory evidence of human immunodeficiency virus [HIV]
+R762,False-positive serological test for syphilis
+W579,Bitten or stung by nonvenomous insect and other nonvenomous arthropods - Unspecified place
+Z113,Special screening examination for infections with a predominantly sexual mode of transmission
+Z114,Special screening examination for human immunodeficiency virus [HIV]
+Z202,Contact with and exposure to infections with a predominantly sexual mode of transmission
+Z205,Contact with and exposure to viral hepatitis
+Z206,Contact with and exposure to human immunodeficiency virus [HIV]
+Z208,Contact with and exposure to other communicable diseases
+Z21,Asymptomatic human immunodeficiency virus [HIV] infection status
+Z224,Carrier of infections with a predominantly sexual mode of transmission
+Z226,Carrier of human T-lymphotropic virus type- 1 [HTLV-1] infection
+Z246,Need for immunization against viral hepatitis
+Z70,"Counselling related to sexual attitude, behaviour and orientation"
+Z700,Counselling related to sexual attitude
+Z701,Counselling related to patient's sexual behaviour and orientation
+Z702,Counselling related to sexual behaviour and orientation of third party
+Z703,"Counselling related to combined concerns regarding sexual attitude, behaviour and orientation"
+Z708,Other sex counselling
+Z709,"Sex counselling, unspecified"
+Z717,Human immunodeficiency virus [HIV] counselling
+Z725,High-risk sexual behaviour
+Z830,Family history of human immunodeficiency virus [HIV] disease
+Z861,Personal history of infectious and parasitic diseases
+N46,Male infertility
+N739,"Female pelvic inflammatory disease, unspecified"
+N741,Female tuberculous pelvic inflammatory disease
+N748,Female pelvic inflammatory disorders in other diseases classified elsewhere
+O030,"Spontaneous abortion: Incomplete, complicated by genital tract and pelvic infection"
+O035,"Spontaneous abortion: Complete or unspecified, complicated by genital tract and pelvic infection"
+O040,"Medical abortion: Incomplete, complicated by genital tract and pelvic infection"
+O045,"Medical abortion: Complete or unspecified, complicated by genital tract and pelvic infection"
+O050,"Other abortion: Incomplete, complicated by genital tract and pelvic infection"
+O055,"Other abortion: Complete or unspecified, complicated by genital tract and pelvic infection"
+O065,"Unspecified abortion: Complete or unspecified, complicated by genital tract and pelvic infection"
+O070,"Failed medical abortion, complicated by genital tract and pelvic infection"
+O073,"Failed medical abortion, with other and unspecified complications"
+O075,"Other and unspecified failed attempted abortion, complicated by genital tract and pelvic infection"
+O080,Genital tract and pelvic infection following abortion and ectopic and molar pregnancy
+O235,Infections of the genital tract in pregnancy
+O861,Other infection of genital tract following delivery
+P391,Neonatal conjunctivitis and dacryocystitis
+Z917,Personal history of female genital mutilation
