@@ -12,7 +12,7 @@ Raw data were extracted from local EHRs and transformed into the [Observational 
 
 These data include longitudinal physiology, treatments, laboratory findings, diagnoses and outcomes.
 
-he database includes 165,420 patients across 256,804 hospital presentations; 16.7 million hours of clinical care; 3,752 deaths (both COVID-19- and non-COVID-19-related); 108 million measured clinical observations encompassing vital signs, acute physiology and laboratory findings; 2.64 million clinical diagnoses relating to both acute and chronic health conditions; and 15.19 million drug administration events.
+The database includes 165,420 patients across 256,804 hospital presentations; 16.7 million hours of clinical care; 3,752 deaths (both COVID-19- and non-COVID-19-related); 108 million measured clinical observations encompassing vital signs, acute physiology and laboratory findings; 2.64 million clinical diagnoses relating to both acute and chronic health conditions; and 15.19 million drug administration events.
 
 ## Data access information
 See https://healthdatagateway.org/en/dataset/998
