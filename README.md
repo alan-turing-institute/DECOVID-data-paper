@@ -4,7 +4,7 @@
 
 This repository is archived on Zenodo:
 
-Karoune, E., Goudie, R. J. B., Bakewell, N., Aslett, L., & Gardiner, S. (2025). alan-turing-institute/DECOVID-data-paper: DECOVID data paper repository (Version V1). Zenodo. https://doi.org/10.5281/zenodo.16325641
+Goudie, R. J. B., Bakewell, N., Karoune, E., Gardiner, S., & Aslett, L. (2025). alan-turing-institute/DECOVID-data-paper: DECOVID data paper repository (Version V1). Zenodo. https://doi.org/10.5281/zenodo.16325641
 
 
 ## Introduction
