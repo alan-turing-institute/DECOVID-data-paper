@@ -39,6 +39,8 @@ Code:
    * This folder contains the code used for the figures in the data paper.
 * **DECOVID Data Definition Language (DDL)** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/Data-Definition-Language)
   * This folder the DDL for the dataset.
+* **DECOVID QC code** - [link to folder](https://github.com/alan-turing-institute/DECOVID-data-paper/tree/main/QC)
+  * This folder the QC SQL scripts for the dataset.
 
 Other information:
 * **OMOP Wiki** - [link to wiki](https://github.com/alan-turing-institute/DECOVID-data-paper/wiki/OMOP-wiki)
